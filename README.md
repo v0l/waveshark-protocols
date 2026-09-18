@@ -5,10 +5,11 @@ found, and the field layout. [WaveShark](https://github.com/v0l/waveshark)
 reads these both ways, so a description decodes what it hears and keys what
 it is asked to send.
 
-The receiver fetches this repository as a dataset and runs these files over
-the copies built into it, so a fix or a new device reaches a running receiver
-without a release. A file in `~/.config/waveshark/protocols` overrides both,
-which is where to work on one before sending it here.
+The receiver fetches this repository as a dataset. Nothing is built into it,
+so these files are what it decodes the ISM bands with, and a fix or a new
+device reaches a running receiver without a release. A file in
+`~/.config/waveshark/protocols` overrides what was fetched, which is where to
+work on one before sending it here.
 
 ## Layout
 
@@ -150,6 +151,44 @@ Each is a frame (`hex`, as the fields see it) and the report it must read
 as, with `model` where a group renames it. A vector is run both ways and
 through the slicer; a file whose vectors fail is refused rather than
 installed.
+
+## Checking one
+
+The receiver refuses a description that fails its own vectors, so check
+before sending. From a WaveShark checkout:
+
+```sh
+cargo run --release -p decode --example protocol -- check path/to/protocols
+```
+
+It parses each file, runs every vector both ways and through the slicer, and
+exits non-zero on a failure. It also says what the vectors cannot: a name
+already taken, a frame with no id, one vector where two would catch an id
+read off the wrong bits, and how many single-bit corruptions still decode,
+which is how many frames the receiver will read off noise.
+
+Two commands help getting there. Given bytes you already trust, `vector`
+writes the entry rather than leaving the expected report to be typed out:
+
+```sh
+cargo run --release -p decode --example protocol -- vector weather/nexus.yaml "5c 90 c2 f3 e0"
+  - { hex: "5c90c2f3e0", fields: { battery_ok: true, channel: 2, humidity_pct: 62, id: 92, temperature_c: 19.4 } }
+```
+
+And `read` points the description at a recording, an IQ capture
+(`.cu8`, `.cs8`, `.cs16`, `.cf32`) or a Flipper `.sub`, which is the only
+way to know the timings are right:
+
+```sh
+cargo run --release -p decode --example protocol -- read weather/nexus.yaml nexus_th_433.92M_250k.cu8
+reading with Nexus-TH
+48 bursts
+  burst 0: Nexus-TH battery_ok=true channel=3 humidity_pct=30 id=201 temperature_c=29.4
+```
+
+A description earns its place by reading a real recording, not only its own
+vectors. Say in the file's comment where the layout came from and what it
+was checked against.
 
 ## What is not here
 
