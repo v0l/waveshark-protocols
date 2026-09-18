@@ -1,0 +1,26 @@
+# Jansite Solar tyre pressure sensors, 433.92 MHz: FSK Manchester at 51 us a
+# chip, eleven bytes with a CRC-16. The frame is found by its own dd 33 sync
+# word, which sits inside the payload and which the CRC does not cover; the
+# a6 a6 5a preamble rtl_433 looks for is those same bits seen as raw chips. Pressure is in units of 1.6 kPa and temperature is
+# offset by 55. The byte after the id and the byte before the CRC have no
+# known meaning; the battery bits have not been found either.
+#
+# Layout from rtl_433 src/devices/tpms_jansite_solar.c, checked against the
+# rtl_433_tests Jansite_TPMS captures.
+name: Jansite-Solar
+timing: { manchester: [51, 102], reset_us: 5000 }
+frame: { bits: 88, find: sync, sync: "dd33", sync_bits: 16, sync_skip: 0 }
+check: { kind: crc16, poly: 0x8005, init: 0x0000, over: [16, 72], at: 72 }
+fields:
+  - { bits: 16, const: 0xdd33 }
+  - { name: id, bits: 24, data: text, type: hex, id: true }
+  - { name: flags, bits: 8, data: int }
+  - { name: temperature_c, bits: 8, data: int, unit: c, offset: -55, min: -40, max: 120 }
+  - { name: pressure_kpa, bits: 8, data: float, unit: kpa, scale: 1.6, round: 1 }
+  - { name: unknown, bits: 8, data: int }
+  - { bits: 16, hidden: true }
+vectors:
+  - hex: "dd 33 db 15 02 00 4c 54 00 b3 a1"
+    fields: { id: "db1502", flags: 0, temperature_c: 21, pressure_kpa: 134.4, unknown: 0 }
+  - hex: "dd 33 a6 d8 00 00 4c 51 00 0f 42"
+    fields: { id: "a6d800", flags: 0, temperature_c: 21, pressure_kpa: 129.6, unknown: 0 }

@@ -1,0 +1,30 @@
+# Honda TPMS sensors built by TRW, part PPA-GF33, seen on a 2010 Insight and
+# likely shared across 2009 to 2016 models. 315 MHz: FSK Manchester at 50 us
+# a half bit, eight bytes with a CRC-8, behind a 23 bit marker that ends on
+# a deliberately invalid Manchester transition, which is what makes it
+# findable.
+#
+# Not the same wire format as the TRW sensors fitted to Chryslers, despite
+# the same maker. Pressure is fifths of a PSI, temperature is offset by
+# fifty. The flags byte has read 0xe1 on every sample, all of them from a
+# parked car, so nothing is known about what it does while driving.
+#
+# One sensor: the corpus has a single Honda TPMS.
+#
+# Layout from rtl_433 src/devices/tpms_honda.c, checked against the
+# rtl_433_tests Honda_TRW_TPMS capture and codes.
+name: Honda-TRW
+timing: { nrz: 50, reset_us: 200 }
+frame: { bits: 64, find: sync, sync: "dae354", sync_bits: 23, decode: manchester }
+check: { kind: crc8, poly: 0x07, init: 0x00, over: [0, 56], at: 56 }
+fields:
+  - { name: pressure_psi, bits: 8, data: float, unit: psi, scale: 0.2, round: 1 }
+  - { name: temperature_c, bits: 8, data: int, unit: c, offset: -50, min: -40, max: 120 }
+  - { name: id, bits: 32, data: text, type: hex, id: true }
+  - { name: flags, bits: 8, data: int }
+  - { bits: 8, hidden: true }
+vectors:
+  - hex: "00 45 8d 3f 6d 67 e1 80"
+    fields: { pressure_psi: 0.0, temperature_c: 19, id: "8d3f6d67", flags: 225 }
+  - hex: "49 43 8d 3f 6d 67 e1 06"
+    fields: { pressure_psi: 14.6, temperature_c: 17, id: "8d3f6d67", flags: 225 }

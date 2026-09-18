@@ -1,0 +1,48 @@
+# Acurite and Chaney 985 fridge and freezer thermometer, 433.7 MHz: PPM,
+# seven bytes sent least significant bit first throughout, so the frame is
+# reflected before anything reads it. A reflected CRC-8 closes it, over the
+# four bytes after the two byte preamble.
+#
+# Temperature is whole degrees Fahrenheit in sign and magnitude, not two's
+# complement. The low bit of the status byte says which of the pair this is,
+# and the two sensors use different bits of that byte for the battery: the
+# fridge sensor 0x02 and the freezer 0x04. The console labels them 1R and
+# 2F.
+#
+# The sensor often drops the last bit of the frame, which rtl_433 works
+# around by retrying the CRC with that bit set; nothing like that is
+# possible here, so those frames are simply not read.
+#
+# One thermometer: the corpus has a single 985. Its pulses measure 544 and
+# 1092 us and its gaps 632 and 1188, so both halves of every symbol vary
+# together and neither the PWM nor the PPM model fits it; rtl_433 reads it
+# as PPM with a wide tolerance, WaveShark reads nothing, so this one is
+# vector-checked rather than read off the air.
+#
+# Layout from rtl_433 src/devices/acurite.c, checked against the
+# rtl_433_tests acurite/Acurite_985 captures.
+name: Acurite-985
+timing: { ppm: [556, 1104], sync_us: 2996, reset_us: 7636 }
+frame: { bits: 56, find: rows, copies: 1, row_bits: [56, 60] }
+transform: [reflect_bytes]
+check: { kind: crc8_le, poly: 0x07, init: 0x00, over: [16, 48], at: 48 }
+fields:
+  - { bits: 8, const: 0xff }
+  - { bits: 8, const: 0x5f }
+  - { name: temperature_f, bits: 8, type: sign_mag, data: int, unit: f, min: -40, max: 150 }
+  - { name: id, bits: 16, data: int, id: true }
+  - { name: status, bits: 8, data: int }
+  - { bits: 8, hidden: true }
+  - { name: sensor_num, at: 47, bits: 1, hidden: true }
+  - { name: channel, at: 47, bits: 1, data: text, map: { 0: 1R, 1: 2F } }
+  - when: { sensor_num: 0 }
+    fields:
+      - { name: battery_ok, at: 46, bits: 1, data: bool, type: bool, not: true }
+  - when: { sensor_num: 1 }
+    fields:
+      - { name: battery_ok, at: 45, bits: 1, data: bool, type: bool, not: true }
+vectors:
+  - hex: "ff 5f 7f a3 40 70 51"
+    fields: { temperature_f: 127, id: 41792, status: 112, channel: 1R, battery_ok: true }
+  - hex: "ff 5f 66 a3 40 70 36"
+    fields: { temperature_f: 102, id: 41792, status: 112, channel: 1R, battery_ok: true }
