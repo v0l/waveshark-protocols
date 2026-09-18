@@ -10,6 +10,20 @@ the copies built into it, so a fix or a new device reaches a running receiver
 without a release. A file in `~/.config/waveshark/protocols` overrides both,
 which is where to work on one before sending it here.
 
+## Layout
+
+One directory per kind of device, named for what it is rather than who
+sells it, since the same layout ships under a dozen brands:
+
+- `weather/` temperature, humidity, rain and wind sensors
+- `remotes/` fixed-code keyfobs, gate and garage remotes
+- `tpms/` tyre pressure sensors
+- `meters/` utility meters
+- `security/` door and window sensors, alarm panels
+
+The receiver reads every `.yaml` in the tree, whatever directory it is in;
+the directories are for people.
+
 ## A description
 
 ```yaml
