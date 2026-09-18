@@ -1,0 +1,32 @@
+# Chrysler car remotes, 315 MHz: the 56008761, 56008762, 04686366 and
+# 56021903AA fobs. PWM, inverted, every byte sent least significant bit
+# first, six bytes with a sum of the five before it.
+#
+# This is a fixed code remote with no rolling counter, so a captured frame
+# replays. The button code is a bit per button, 1 unlock, 2 lock, 4 panic,
+# and holding two buttons together sends both bits with the multi press bit
+# set.
+#
+# Layout from rtl_433 src/devices/chrysler_car_remote.c, checked against the
+# rtl_433_tests chrysler_car_remote captures. The pulses sit in a fixed
+# 4.16 ms period but are only 0.32 or 0.65 ms long, so the gap is nothing
+# like the other pulse width; WaveShark's PWM slicer finds the bursts and
+# reads no frame (v0l/waveshark#146), and this one is vector-checked rather
+# than read off the air.
+name: Chrysler-CarRemote
+timing: { pwm: [350, 700], sync_us: 7350, reset_us: 17500 }
+frame: { bits: 48, invert: true, find: rows, copies: 1, row_bits: [48, 50], repeats: 2 }
+transform: [reflect_bytes]
+check: { kind: sum8, over: [0, 40], at: 40 }
+fields:
+  - { name: id, bits: 32, data: text, type: hex, upper: true, id: true }
+  - { name: button_code, bits: 4, data: int }
+  - { bits: 1, hidden: true, default: 0 }
+  - { name: multi_press, bits: 1, data: bool, type: bool }
+  - { bits: 2, hidden: true, default: 0 }
+  - { bits: 8, hidden: true }
+vectors:
+  - hex: "40 1a 7f ed 20 e6"
+    fields: { id: "401A7FED", button_code: 2, multi_press: false }
+  - hex: "40 fc 4a cd 40 93"
+    fields: { id: "40FC4ACD", button_code: 4, multi_press: false }

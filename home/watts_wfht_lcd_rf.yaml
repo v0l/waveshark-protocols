@@ -1,0 +1,42 @@
+# Watts WFHT-LCD-RF underfloor heating thermostat, 433.92 MHz, in practice
+# about 73 kHz above it: OOK Manchester at 460 us a chip behind a
+# d3 91 d3 91 sync, sixteen bytes closed by a CRC-16.
+#
+# The byte before that CRC is an application CRC-8 this does not check: it
+# is xored with the call for heat byte as well as with a constant, and a
+# check whose input includes another byte of the frame cannot be written
+# here, so it is reported raw. The radio CRC-16 alone is enough to trust a
+# frame.
+#
+# The thermostat runs its own proportional controller and turns the duty
+# cycle into an on or off pattern across fifteen minutes, so the call for
+# heat byte only ever reads 0 or 100. Changing the setpoint sends three
+# frames in a second, the middle one a tenth of a degree higher than the
+# other two, which is why a setpoint stream needs debouncing. In cool mode
+# the call for heat bit means call for cool.
+#
+# One thermostat: the corpus has only the one.
+#
+# Layout from rtl_433 src/devices/watts_wfht_rf.c, checked against the
+# rtl_433_tests watts_wfht_rf captures.
+name: Watts-WFHTLCDRF
+timing: { manchester: [460, 920], reset_us: 900 }
+frame: { bits: 128, find: sync, sync: "d391d391", sync_bits: 32 }
+check: { kind: crc16, poly: 0x8005, init: 0xffff, over: [0, 112], at: 112 }
+fields:
+  - { bits: 8, const: 0x0d }
+  - { bits: 24, const: 0xfffffe }
+  - { bits: 6, hidden: true, default: 0 }
+  - { name: mode, bits: 1, data: text, map: { 1: heat, 0: cool } }
+  - { name: pairing, bits: 1, data: bool, type: bool }
+  - { name: id, bits: 24, data: text, type: hex, id: true }
+  - { name: temperature_c, bits: 16, data: float, unit: c, scale: 0.1, min: -20, max: 60 }
+  - { name: setpoint_c, bits: 16, data: float, unit: c, scale: 0.1, max: 60 }
+  - { name: call_for_heat, bits: 8, data: int, unit: pct, max: 100 }
+  - { name: app_check, bits: 8, data: int }
+  - { bits: 16, hidden: true }
+vectors:
+  - hex: "0d ff ff fe 02 34 9e 48 00 ff 00 af 00 2a bd 33"
+    fields: { id: "349e48", mode: heat, pairing: false, temperature_c: 25.5, setpoint_c: 17.5, call_for_heat: 0, app_check: 42 }
+  - hex: "0d ff ff fe 03 34 9e 48 01 04 00 b0 00 d0 8f 7f"
+    fields: { id: "349e48", mode: heat, pairing: true, temperature_c: 26.0, setpoint_c: 17.6, call_for_heat: 0, app_check: 208 }

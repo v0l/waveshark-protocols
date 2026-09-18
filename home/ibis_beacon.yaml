@@ -1,0 +1,31 @@
+# IBIS vehicle information beacon, the short range broadcast buses and trams
+# use to announce themselves to stop displays and ticket machines.
+# 433.92 MHz: Manchester at 30 us a half period behind an aa b preamble,
+# twenty eight bytes closed by a CRC-16.
+#
+# Only the vehicle number and a counter that goes up when the doors open
+# have been worked out. The rest of the frame carries a company id and
+# various flags nobody has separated, so it is reported as the hex it
+# arrives as, in the three runs around the two known fields.
+#
+# One vehicle: the corpus has a single IBIS recording.
+#
+# Layout from rtl_433 src/devices/ibis_beacon.c, checked against the
+# rtl_433_tests IBIS_beacon capture.
+name: IBIS-Beacon
+timing: { manchester: [30, 60], reset_us: 100 }
+frame: { bits: 224, find: sync, sync: "ab", sync_bits: 8 }
+check: { kind: crc16, poly: 0x8005, init: 0x0000, over: [0, 208], at: 208 }
+fields:
+  - { name: prefix, bits: 40, data: text, type: hex }
+  - { name: unknown1, bits: 4, data: int }
+  - { name: id, bits: 16, data: int, id: true }
+  - { name: unknown2, bits: 4, data: int }
+  - { name: middle, bits: 64, data: text, type: hex }
+  - { name: middle2, bits: 32, data: text, type: hex }
+  - { name: counter, bits: 32, data: int }
+  - { name: tail, bits: 16, data: text, type: hex }
+  - { bits: 16, hidden: true }
+vectors:
+  - hex: "91 43 d0 6f 92 71 fc 30 00 00 00 00 00 00 00 00 00 00 00 02 00 00 02 03 0f a0 6b 6e"
+    fields: { prefix: "9143d06f92", unknown1: 7, id: 8131, unknown2: 0, middle: "0000000000000000", middle2: "00000002", counter: 515, tail: "0fa0" }
