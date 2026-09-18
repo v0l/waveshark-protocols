@@ -1,0 +1,44 @@
+# Watchman Sonic Advanced and Plus oil tank monitors, and the Tekelek
+# sensors that share the frame. 433.92 MHz: FSK at 500 us a chip behind an
+# aa aa preamble and a 2d d4 sync, seventeen bytes closed by a CRC-16.
+#
+# Depth is centimetres from the sensor down to the oil. The status byte is
+# 0xc0 while the sensor is still syncing to its receiver and transmitting
+# once a second, 0x80 for the calibration frames just after, and 0x98 once
+# it is running. The model word is 0x0401 on a Watchman Sonic Advanced and
+# 0x0106 or 0x0101 on a Tekelek.
+#
+# Temperature is half degree steps offset by 0x48. rtl_433 divides by two
+# with integer arithmetic and so prints whole degrees, where this reports
+# the half step the sensor actually sent.
+#
+# Layout from rtl_433 src/devices/oil_watchman_advanced.c, checked against
+# the rtl_433_tests oil_watchman_sonic_advanced captures.
+name: Oil-SonicAdv
+timing: { nrz: 500, reset_us: 12500 }
+frame: { bits: 136, find: sync, sync: "aa2dd4", sync_bits: 24 }
+check: { kind: crc16, poly: 0x8005, init: 0x0000, over: [0, 120], at: 120 }
+fields:
+  - { bits: 8, const: 0x0e }
+  - { name: model_code, bits: 16, data: int, in: [0x0401, 0x0106, 0x0101] }
+  - { name: id, bits: 24, data: int, id: true }
+  - { name: status, bits: 8, data: int }
+  - { name: temperature_c, bits: 8, data: float, unit: c, scale: 0.5, offset: -36, min: -30, max: 80 }
+  - { name: sensor_raw, bits: 8, data: int }
+  - { name: sensor_raw_high, bits: 4, data: int }
+  - { name: depth_cm, bits: 12, data: int, max: 4095 }
+  - { bits: 4, const: 0 }
+  - { name: version_major, bits: 4, data: int }
+  - { bits: 4, const: 0 }
+  - { name: version_minor, bits: 4, data: int }
+  - { bits: 4, const: 0 }
+  - { name: version_patch, bits: 4, data: int }
+  - { bits: 4, const: 0 }
+  - { name: version_build, bits: 4, data: int }
+  - { bits: 16, hidden: true }
+  - { name: version, data: text, type: format, format: "{version_major}.{version_minor}.{version_patch}.{version_build}" }
+vectors:
+  - hex: "0e 04 01 50 4a 24 98 52 a9 60 5f 01 05 03 00 dd ba"
+    fields: { model_code: 1025, id: 5261860, status: 152, temperature_c: 5.0, sensor_raw: 169, sensor_raw_high: 6, depth_cm: 95, version_major: 1, version_minor: 5, version_patch: 3, version_build: 0, version: "1.5.3.0" }
+  - hex: "0e 04 01 53 b5 cb 90 63 89 80 67 01 07 03 00 76 61"
+    fields: { model_code: 1025, id: 5486027, status: 144, temperature_c: 13.5, sensor_raw: 137, sensor_raw_high: 8, depth_cm: 103, version_major: 1, version_minor: 7, version_patch: 3, version_build: 0, version: "1.7.3.0" }

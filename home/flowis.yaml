@@ -1,0 +1,50 @@
+# Flowis water meter, 868 MHz: FSK at 10 us a chip behind a d3 91 d3 91
+# sync, the sync word the CC110x family ships with. Twenty one bytes closed
+# by a CRC-16 that starts at the length byte.
+#
+# The meter sends two message types. This is type 1, the reading: meter id,
+# the meter's own clock, the total volume in litres, and two status bytes.
+# Type 2 is a byte longer and is mostly zeros, which nothing has worked out
+# and which rtl_433 does not read either.
+#
+# Everything multi-byte is little endian, and the clock is bit packed across
+# four bytes with its fields running the other way, so each one is gathered
+# from two places.
+#
+# One meter: the corpus has only the one Flowis.
+#
+# Layout from rtl_433 src/devices/flowis.c, checked against the
+# rtl_433_tests flowis captures. rtl_433 only gets clean bits out of those
+# recordings with -Y minmax, and its default slicer returns a frame with bit
+# errors; WaveShark finds the bursts and reads nothing, so this one is
+# vector-checked rather than read off the air.
+name: Flowis
+timing: { nrz: 10, reset_us: 5000 }
+frame: { bits: 168, find: sync, sync: "d391d391", sync_bits: 32 }
+check: { kind: crc16, poly: 0x8005, init: 0xffff, over: [0, 152], at: 152 }
+fields:
+  - { bits: 8, const: 0x12 }
+  - { name: msg_type, bits: 8, data: int, in: [1] }
+  - { bits: 32, hidden: true }
+  - { name: unknown1, bits: 8, data: int }
+  - { bits: 32, hidden: true }
+  - { bits: 24, hidden: true }
+  - { name: backflow, bits: 8, data: int }
+  - { name: alarm, bits: 8, data: int }
+  - { bits: 16, hidden: true, default: 0 }
+  - { name: unknown2, bits: 8, data: int }
+  - { bits: 16, hidden: true }
+  - { name: id, gather: [[40, 48], [32, 40], [24, 32], [16, 24]], data: int, id: true }
+  - { name: volume_m3, gather: [[104, 112], [96, 104], [88, 96]], data: float, scale: 0.001, round: 3 }
+  - { name: clock_year, at: 80, bits: 6, data: int, offset: 2000 }
+  - { name: clock_month, gather: [[86, 88], [72, 74]], data: int, max: 12 }
+  - { name: clock_day, at: 74, bits: 5, data: int, max: 31 }
+  - { name: clock_hour, gather: [[79, 80], [64, 68]], data: int, max: 23 }
+  - { name: clock_min, gather: [[68, 72], [56, 58]], data: int, max: 59 }
+  - { name: clock_sec, at: 58, bits: 6, data: int, max: 59 }
+  - { name: device_time, data: text, type: format, format: "{clock_year}-{clock_month:02}-{clock_day:02}T{clock_hour:02}:{clock_min:02}:{clock_sec:02}" }
+vectors:
+  - hex: "12 01 b6 4f 51 0e 81 c3 74 60 5c ef 00 00 00 45 00 00 a5 5f f7"
+    fields: { msg_type: 1, id: 240209846, unknown1: 129, volume_m3: 0.239, backflow: 0, alarm: 69, unknown2: 165, clock_year: 2023, clock_month: 1, clock_day: 16, clock_hour: 7, clock_min: 19, clock_sec: 3, device_time: "2023-01-16T07:19:03" }
+  - hex: "12 01 b6 4f 51 0e 81 da 74 60 5c ef 00 00 00 45 00 00 a5 1b 8d"
+    fields: { msg_type: 1, id: 240209846, unknown1: 129, volume_m3: 0.239, backflow: 0, alarm: 69, unknown2: 165, clock_year: 2023, clock_month: 1, clock_day: 16, clock_hour: 7, clock_min: 19, clock_sec: 26, device_time: "2023-01-16T07:19:26" }

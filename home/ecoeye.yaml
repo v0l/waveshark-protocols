@@ -1,0 +1,25 @@
+# Eco-Eye Smart PV current monitor, the transmitter with two clamps that
+# sends to a paired display every four seconds. Around 433.9 MHz, drifting
+# with temperature: FSK at 200 us a chip behind an aa aa preamble and a
+# 2d d4 sync, five bytes with a sum of the four before it.
+#
+# One clamp is on the grid feed and the other on the solar generation, both
+# counted in hundredths of an amp. There is no transmitter id at all, so two
+# of these in earshot cannot be told apart, and no voltage is sent either,
+# so power has to be guessed from the mains voltage.
+#
+# Layout from rtl_433 src/devices/ecoeye.c, checked against the
+# rtl_433_tests EcoEye captures.
+name: EcoEye
+timing: { nrz: 200, reset_us: 8100 }
+frame: { bits: 40, find: sync, sync: "aa2dd4", sync_bits: 24 }
+check: { kind: sum8, over: [0, 32], at: 32 }
+fields:
+  - { name: current_pv_a, bits: 16, data: float, unit: a, scale: 0.01, round: 2 }
+  - { name: current_used_a, bits: 16, data: float, unit: a, scale: 0.01, round: 2 }
+  - { bits: 8, hidden: true }
+vectors:
+  - hex: "00 1f 00 81 a0"
+    fields: { current_pv_a: 0.31, current_used_a: 1.29 }
+  - hex: "00 1d 00 7a 97"
+    fields: { current_pv_a: 0.29, current_used_a: 1.22 }

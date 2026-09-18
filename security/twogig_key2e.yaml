@@ -1,0 +1,27 @@
+# 2GIG KEY2E-345 four button keyfob, 345 MHz: the same Manchester family and
+# 555556 preamble as the Honeywell 5800 and 2GIG door contacts, but nine
+# bytes instead of six, closed by a CRC-16 with starting value 0x4c57.
+#
+# The identity and the button are both encrypted by 2GIG's undocumented
+# eSeries scheme, so neither is readable and this reports them as the hex
+# they arrive as. The byte between them is 0x25 in every frame anyone has
+# captured. Nobody has two presses of the same button on the same fob, so
+# there is not even enough evidence to say whether the payload rolls, which
+# means a frame identifies a keyfob press but not which fob or which button.
+#
+# Layout from rtl_433 src/devices/twogig_key2e.c, checked against the
+# rtl_433_tests twogig_key2e captures.
+name: TwoGig-KEY2E345
+timing: { nrz: 136, reset_us: 408 }
+frame: { bits: 72, find: sync, sync: "555556", sync_bits: 24, decode: manchester }
+check: { kind: crc16, poly: 0x8005, init: 0x4c57, over: [0, 56], at: 56 }
+fields:
+  - { name: encrypted_id, bits: 32, data: text, type: hex }
+  - { bits: 8, const: 0x25 }
+  - { name: encrypted_status, bits: 16, data: text, type: hex }
+  - { bits: 16, hidden: true }
+vectors:
+  - hex: "00 9a a0 48 25 0e 25 a5 04"
+    fields: { encrypted_id: "009aa048", encrypted_status: "0e25" }
+  - hex: "eb ea de b5 25 0d 7a 7b 79"
+    fields: { encrypted_id: "ebeadeb5", encrypted_status: "0d7a" }

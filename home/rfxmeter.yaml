@@ -1,0 +1,36 @@
+# RFXMeter and RFXPower pulse counters, 433.92 MHz: an X10-like PPM frame of
+# six bytes, closed by a nibble sum over the whole message that comes to 0xf.
+#
+# The counter value arrives with its three bytes out of order, most
+# significant last. What a count means depends on the module: the RFXPower
+# reads energy to a thousandth of a kilowatt hour, so it wraps at 16777.215.
+# The message type is 0 for a reading and 1, 2 or 3 for the configuration
+# frames a receiver sends back, which carry an interval, a calibration in
+# microseconds or a new address in the same field.
+#
+# The second byte is the address with its high nibble complemented, which is
+# the complement check here; its low nibble repeats the address's low nibble
+# and is reported rather than checked.
+#
+# Layout from rtl_433 src/devices/rfxmeter.c, checked against the
+# rtl_433_tests RfxMeter captures.
+name: RfxMeter
+timing: { ppm: [500, 1500], reset_us: 5000 }
+frame: { bits: 48, find: rows, copies: 1, row_bits: [48, 49], repeats: 4 }
+check:
+  - { kind: nibble_sum, over: [0, 44], at: 44, width: 4, negate: true, init: 0x0f }
+  - { kind: complement, over: [0, 4], at: 8 }
+fields:
+  - { name: id, bits: 8, data: int, id: true }
+  - { bits: 4, hidden: true }
+  - { name: id_low, bits: 4, data: int }
+  - { bits: 16, hidden: true }
+  - { bits: 8, hidden: true }
+  - { name: msg_type, bits: 4, data: int }
+  - { bits: 4, hidden: true }
+  - { name: msg_value, gather: [[32, 40], [16, 24], [24, 32]], data: int }
+vectors:
+  - hex: "01 f1 ce d9 19 04"
+    fields: { id: 1, id_low: 1, msg_type: 0, msg_value: 1691353 }
+  - hex: "02 f2 59 09 75 09"
+    fields: { id: 2, id_low: 2, msg_type: 0, msg_value: 7690505 }
