@@ -97,7 +97,8 @@ the bits covered (the end exclusive, packed into bytes) and `at` the bit the
 stored value starts at. Kinds: `crc8`, `crc8_le`, `crc16`, `crc16_le` (with
 `poly` and `init`), `sum8`, `xor8`, `lfsr8` and `lfsr8_reflect` (with `gen`
 and `key`), `nibble_sum` (with `add` or `negate` from `init`, and `width`
-where the stored sum is not a byte), `nibble_xor`, `even_parity` (every
+where the stored sum is not a byte), `nibble_xor`, `roll8` (a per-byte LFSR digest keyed from `gen` and only
+shifted, which is what Globaltronics' rolling byte is), `even_parity` (every
 byte covered, nothing stored) and `complement` (the stored bits are the
 covered bits inverted). `xor` is applied to the computed value; `reflect`
 stores it low bit first and sums nibbles as they read reversed; `swap`
@@ -152,8 +153,7 @@ installed.
 
 ## What is not here
 
-A description says what it can invert. Globaltronics (a rolling byte for
-a check), Hideki (a parity bit inside every byte), Oregon v2.1 (every bit
+A description says what it can invert. Hideki (a parity bit inside every byte), Oregon v2.1 (every bit
 sent twice), Interlogix (parity folded over the frame), the ERT meters,
 KeeLoq, Somfy RTS, ISM868 and the electronic shelf labels stay written in
 WaveShark.
