@@ -30,6 +30,7 @@ the directories are for people.
 name: Nexus-TH
 timing: { ppm: [1000, 2000], reset_us: 5000 }
 frame: { bits: 36, repeats: 12 }
+yields_to: [Rubicson-Temperature]
 fields:
   - { name: id, bits: 8 }
   - { name: battery_ok, bits: 1, type: bool }
@@ -42,24 +43,86 @@ vectors:
     fields: { id: 0x5c, channel: 2, temperature_c: 19.4, humidity_pct: 62, battery_ok: true }
 ```
 
-- `timing` is `pwm: [short, long]` or `ppm: [short, long]` in microseconds,
-  with `reset_us`, and `sync_us` where a frame starts with a sync mark.
-  These are rtl_433's numbers and can be copied from its decoders.
-- `frame.bits` is the frame length. `invert` complements the slicer's bits
-  first, which the fixed-code remotes need. `find: tile` requires identical
-  frames tiling the burst end to end; the default corroborates a frame by a
-  row start, an exactly sized burst, or a copy one frame away.
-  `min_transitions` refuses a frame that is one symbol repeated.
-- Fields are read in order, most significant bit first, and every bit of
-  the frame belongs to exactly one field or `const`. A field with `at:` is a
-  view over bits another field owns, shown on decode and ignored on encode.
-  `type` is `uint`, `int` or `bool`; `scale` and `offset` turn a raw count
-  into the reading; `min`/`max` reject the implausible; `omit_if` leaves a
-  raw value out of the report; `map` names values; `hidden` reads a field
-  for conditions only. A group `when: { field: value }` with `fields` and
-  `else` reads one layout or the other.
-- `vectors` are the test. Each is run both ways and through the slicer, and
-  a file whose vectors fail is refused rather than installed.
+### timing
+
+One of `pwm: [short, long]` (the mark carries the bit), `ppm: [short,
+long]` (the gap does), `manchester: [half, full]` or `nrz: bit_us`, all in
+microseconds, with `reset_us` for the gap that ends a package, `sync_us`
+where a sync mark opens each frame, and `tolerance_us`. These are rtl_433's
+numbers and copy straight from its decoders.
+
+### frame
+
+- `bits`: the frame's length.
+- `invert`: the slicer's bits are complemented first, which the fixed-code
+  remotes and several PWM sensors need.
+- `find`: how the frame is located. `repeat` (the default) takes a frame at
+  a row start, in an exactly sized package, or with a copy one frame away.
+  `tile` wants identical frames end to end, as a remote sends. `exact` wants
+  the package to be the frame. `rows` wants a row of the frame's length (or
+  `row_bits: [lo, hi]`) on `copies` rows, or alone. `sync` searches for
+  `sync` (hex, `sync_bits` long) at any bit offset and takes the frame
+  `sync_skip` bits after it, `either_polarity` searching the complement too
+  and `decode: manchester` or `diff_manchester` reading the bits behind it
+  as chips.
+- `row_bits: [lo, hi]`: with any other `find`, a row of the package must be
+  this long.
+- `min_transitions`: refuses a frame that is one symbol repeated.
+  `not_constant: n`: refuses one whose first `n` bits are all alike.
+- `repeats`: copies one transmission sends, for keying.
+
+### transform and check
+
+`transform` is a list of `reflect_bytes`, `reflect_nibbles` or
+`swap_nibbles`, applied to the frame before anything reads it.
+
+`check` is one or a list of `{ kind, over: [from, to], at }`, `over` being
+the bits covered (the end exclusive, packed into bytes) and `at` the bit the
+stored value starts at. Kinds: `crc8`, `crc8_le`, `crc16`, `crc16_le` (with
+`poly` and `init`), `sum8`, `xor8`, `lfsr8` and `lfsr8_reflect` (with `gen`
+and `key`), `even_parity` (every byte covered, nothing stored) and
+`complement` (the stored bits are the covered bits inverted). `xor` is
+applied to the computed value. A frame with a check reports it as verified;
+one without reports no integrity check, which the packet list shows.
+
+### fields
+
+Fields are read in order, most significant bit first, and every bit of the
+frame belongs to exactly one field in turn, a `const`, or a nameless
+`hidden` slot (which a check fills on encode). A field with `at:` is a
+view over bits another field owns: reported on decode, ignored on encode.
+
+- `type`: `uint` (default), `int` (two's complement), `bool`, `bcd`, `hex`,
+  `sign_mag`, `tristate` (PT226x pin pairs), `pick` (which `unit` wide slot
+  is not `idle`, for a remote with a slot per button), `format` (text from
+  other fields, `{name}` or `{name:02}`).
+- `not`, `reflect`: the bits are complemented, or sent low bit first.
+- `per_byte: 7`: only the low seven bits of each byte carry the value.
+- `scale`, `offset`, `convert: f_to_c`, `round`: raw count to reading. A
+  whole-number scale keeps the reading a count.
+- `min`, `max`: refuse the implausible. `in: [..]`: raw values accepted.
+- `map: { raw: value }`, `other: value`: name the values that are not the
+  number. `at_least: n` makes a bool of a wider field.
+- `omit_if: raw` or a list: not reported, and the first when not supplied.
+- `hidden`: read for conditions only. `id: true`: names the transmitter.
+- `when: { field: value }` on a field, or a group `when` / `fields` / `else`
+  with an optional `model` that renames the report.
+
+### vectors
+
+Each is a frame (`hex`, as the fields see it) and the report it must read
+as, with `model` where a group renames it. A vector is run both ways and
+through the slicer; a file whose vectors fail is refused rather than
+installed.
+
+## What is not here
+
+A description says what it can invert. Alecto V1 and Globaltronics
+(checksums with message-dependent terms), Honeywell (a CRC polynomial chosen
+by channel), Hideki (parity bits inside every byte), Oregon Scientific, X10
+(a Gray-coded house switch), Interlogix, the Acurite 5-in-1, the Toyota, Ford
+and Renault TPMS, the ERT meters, KeeLoq, Somfy RTS and the electronic shelf
+labels stay written in WaveShark.
 
 Layouts here are transcribed from [rtl_433](https://github.com/merbanan/rtl_433)
 and the Flipper Zero firmware, which are the only descriptions most of these
