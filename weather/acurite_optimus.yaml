@@ -1,0 +1,68 @@
+# Acurite Optimus weather station, 433.92 MHz: the same PWM frame as the
+# 5-in-1, inverted, ten bytes with an additive sum and even parity on every
+# byte between the id and the sum.
+#
+# Two messages, both carrying the wind speed in whole miles an hour: 0x3b
+# adds temperature and humidity, 0x3a the wind direction and the rain
+# counter. Wind speed and temperature are packed the Atlas way, across a
+# byte boundary, while the direction is the 5-in-1's sixteen point index
+# into a table whose order is not the compass order. Rain is hundredths of
+# an inch, accumulated.
+#
+# The two bytes before the sum are where an Atlas puts its lightning
+# readings, and on this station they never carry anything but 00 9f. Two
+# bits above the temperature, and five above the rain counter, are reported
+# raw because nothing reads them and they are not constant either.
+#
+# Layout from rtl_433 src/devices/acurite.c, checked against the
+# rtl_433_tests acurite/Acurite_Optimus captures.
+name: Acurite-Optimus
+timing: { pwm: [220, 408], sync_us: 620, reset_us: 4000 }
+frame: { bits: 80, invert: true, repeats: 3 }
+check:
+  - { kind: sum8, over: [0, 72], at: 72 }
+  - { kind: even_parity, over: [16, 72] }
+fields:
+  - { name: channel, bits: 2, data: text, in: [0, 2, 3], map: { 0: C, 2: B, 3: A } }
+  - { name: sequence_num, bits: 2, data: int }
+  - { name: id, bits: 12, data: int, id: true }
+  - { bits: 1, hidden: true }
+  - { name: battery_ok, bits: 1, data: bool, type: bool }
+  - { name: message_type, bits: 6, hidden: true, in: [0x3a, 0x3b] }
+  - { bits: 1, hidden: true }
+  - { bits: 7, hidden: true }
+  - { bits: 1, hidden: true }
+  - { bits: 1, hidden: true }
+  - { name: flags, bits: 2, data: int }
+  - { bits: 4, hidden: true }
+  - { bits: 1, hidden: true }
+  - { bits: 5, hidden: true }
+  - { bits: 2, hidden: true }
+  - { bits: 1, hidden: true }
+  - { bits: 7, hidden: true }
+  - { bits: 1, hidden: true }
+  - { bits: 7, hidden: true, default: 0 }
+  - { bits: 1, hidden: true }
+  - { bits: 7, hidden: true, default: 0x1f }
+  - { bits: 8, hidden: true }
+  - { name: message_type, at: 18, bits: 6, data: int }
+  - { name: wind_avg_mi_h, gather: [[25, 32], [33, 34]], data: int, max: 200 }
+  - when: { message_type: 0x3b }
+    fields:
+      - { name: temperature_f, gather: [[36, 40], [41, 48]], data: float, unit: f, scale: 0.1, offset: -40, round: 1, min: -40, max: 158 }
+      - { name: humidity_pct, at: 49, bits: 7, data: int, unit: pct, max: 100 }
+  - when: { message_type: 0x3a }
+    fields:
+      - name: wind_direction_deg
+        at: 36
+        bits: 4
+        data: float
+        unit: deg
+        map: { 0: 315.0, 1: 247.5, 2: 292.5, 3: 270.0, 4: 337.5, 5: 225.0, 6: 0.0, 7: 202.5, 8: 67.5, 9: 135.0, 10: 90.0, 11: 112.5, 12: 45.0, 13: 157.5, 14: 22.5, 15: 180.0 }
+      - { name: rain_in, gather: [[46, 48], [49, 56]], data: float, scale: 0.01, round: 2 }
+      - { name: unknown, gather: [[41, 46]], data: int }
+vectors:
+  - hex: "ca 94 7b 82 27 30 14 00 9f 65"
+    fields: { channel: A, sequence_num: 0, id: 2708, battery_ok: true, message_type: 59, flags: 2, wind_avg_mi_h: 4, temperature_f: 54.4, humidity_pct: 20 }
+  - hex: "ca 94 fa 82 1d f3 00 00 9f 89"
+    fields: { channel: A, sequence_num: 0, id: 2708, battery_ok: true, message_type: 58, flags: 1, wind_avg_mi_h: 4, wind_direction_deg: 157.5, rain_in: 3.84, unknown: 28 }

@@ -1,0 +1,62 @@
+# Acurite Atlas weather station, 433.92 MHz: the same PWM frame as the
+# 5-in-1, inverted, eight bytes with an additive sum and even parity on
+# every byte between the id and the sum.
+#
+# The station splits its readings across three messages, all carrying the
+# wind speed: 5 adds temperature and humidity, 6 wind direction and the rain
+# counter, 7 the UV index and light level. The rain counter is hundredths of
+# an inch and wraps at 5.11, and the light level is tens of lux. Each
+# message is sent three times with a copy number in it, so no two copies
+# match and the corroboration is the rows repeating at the frame's period.
+#
+# An Atlas with the lightning detector fitted sends ten bytes under message
+# types 0x25, 0x26 and 0x27, which is a longer frame than this.
+#
+# Layout from rtl_433 src/devices/acurite.c, checked against the
+# rtl_433_tests acurite/Acurite_Atlas captures.
+name: Acurite-Atlas
+timing: { pwm: [220, 408], sync_us: 620, reset_us: 4000 }
+frame: { bits: 64, invert: true, repeats: 3 }
+check:
+  - { kind: sum8, over: [0, 56], at: 56 }
+  - { kind: even_parity, over: [16, 56] }
+fields:
+  - { name: channel, bits: 2, data: text, in: [0, 2, 3], map: { 0: C, 2: B, 3: A } }
+  - { bits: 2, hidden: true, default: 0 }
+  - { name: sequence_num, bits: 2, data: int }
+  - { name: id, bits: 10, data: int, id: true }
+  - { bits: 1, hidden: true }
+  - { name: battery_ok, bits: 1, data: bool, type: bool }
+  - { name: message_type, bits: 6, hidden: true, in: [5, 6, 7] }
+  - { bits: 1, hidden: true }
+  - { bits: 7, hidden: true }
+  - { bits: 1, hidden: true }
+  - { bits: 1, hidden: true }
+  - { bits: 2, hidden: true, default: 0 }
+  - { bits: 4, hidden: true }
+  - { bits: 1, hidden: true }
+  - { bits: 7, hidden: true }
+  - { bits: 1, hidden: true }
+  - { bits: 7, hidden: true }
+  - { bits: 8, hidden: true }
+  - { name: message_type, at: 18, bits: 6, data: int }
+  - { name: wind_avg_mi_h, gather: [[25, 32], [33, 34]], data: int, max: 200 }
+  - when: { message_type: 5 }
+    fields:
+      - { name: temperature_f, gather: [[36, 40], [41, 48]], data: float, unit: f, scale: 0.1, offset: -40, min: -40, max: 158 }
+      - { name: humidity_pct, at: 49, bits: 7, data: int, unit: pct, max: 100 }
+  - when: { message_type: 6 }
+    fields:
+      - { name: wind_direction_deg, gather: [[35, 40], [41, 46]], data: int, unit: deg, max: 360 }
+      - { name: rain_in, gather: [[46, 48], [49, 56]], data: float, scale: 0.01, round: 2 }
+  - when: { message_type: 7 }
+    fields:
+      - { name: uv_index, at: 36, bits: 4, data: int, max: 16 }
+      - { name: lux, gather: [[41, 48], [49, 56]], data: int, scale: 10 }
+vectors:
+  - hex: "c3 9c c5 00 88 53 b8 b7"
+    fields: { channel: A, sequence_num: 0, id: 924, battery_ok: true, message_type: 5, wind_avg_mi_h: 0, temperature_f: 70.7, humidity_pct: 56 }
+  - hex: "c3 9c c6 00 06 84 05 b4"
+    fields: { channel: A, sequence_num: 0, id: 924, battery_ok: true, message_type: 6, wind_avg_mi_h: 0, wind_direction_deg: 193, rain_in: 0.05 }
+  - hex: "c3 9c 47 00 00 00 24 ca"
+    fields: { channel: A, sequence_num: 0, id: 924, battery_ok: true, message_type: 7, wind_avg_mi_h: 0, uv_index: 0, lux: 360 }

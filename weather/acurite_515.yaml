@@ -1,0 +1,37 @@
+# Acurite 515TX fridge and freezer thermometer, 433.92 MHz: the same PWM
+# frame as the 5-in-1, inverted, six bytes with an additive sum and even
+# parity on every byte between the id and the sum.
+#
+# The message type says which compartment the probe is in, and the console
+# shows the channel and that letter together, so a sensor set to channel A
+# in a freezer reads AF there. The id changes every time the sensor is
+# powered up.
+#
+# Fourteen bits are sent for the temperature where twelve would cover the
+# sensor's own -40 to 158 F, so the top two are expected to stay zero.
+#
+# Layout from rtl_433 src/devices/acurite.c, checked against the
+# rtl_433_tests acurite/Acurite_515TX captures.
+name: Acurite-515
+timing: { pwm: [220, 408], sync_us: 620, reset_us: 4000 }
+frame: { bits: 48, invert: true, repeats: 3 }
+check:
+  - { kind: sum8, over: [0, 40], at: 40 }
+  - { kind: even_parity, over: [16, 40] }
+fields:
+  - { name: channel, bits: 2, data: text, in: [0, 2, 3], map: { 0: C, 2: B, 3: A } }
+  - { name: id, bits: 14, data: int, id: true }
+  - { bits: 1, hidden: true }
+  - { name: battery_ok, bits: 1, data: bool, type: bool }
+  - { name: compartment, bits: 6, data: text, in: [8, 9], map: { 8: refrigerator, 9: freezer } }
+  - { bits: 1, hidden: true }
+  - { bits: 7, hidden: true }
+  - { bits: 1, hidden: true }
+  - { bits: 7, hidden: true }
+  - { bits: 8, hidden: true }
+  - { name: temperature_f, gather: [[25, 32], [33, 40]], data: float, unit: f, scale: 0.1, offset: -148, round: 1, min: -40, max: 158 }
+vectors:
+  - hex: "c6 9b c9 0c 0a 40"
+    fields: { channel: A, id: 1691, battery_ok: true, compartment: freezer, temperature_f: 6.6 }
+  - hex: "c2 88 48 8e b2 d2"
+    fields: { channel: A, id: 648, battery_ok: true, compartment: refrigerator, temperature_f: 36.2 }

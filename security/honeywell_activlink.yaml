@@ -1,0 +1,51 @@
+# Honeywell ActivLink wireless chimes, PIR motion sensors and door contacts,
+# the RCWL300A and RCWL330A and the Series 3, 5 and 9 and Decor ranges.
+# 868 MHz: PWM, inverted, 48 bits sent many times over, closed by a single
+# even parity bit over everything before it.
+#
+# One parity bit is all the integrity there is, so the constants below are
+# doing most of the work of telling a frame from noise: five runs of the
+# frame are always zero.
+#
+# A doorbell sends neither open nor closed, and a contact sensor sets one of
+# the two; both set means the sensor is being tampered with. The knock bit
+# means a doorbell was pressed three times quickly on a chime, and tamper on
+# a contact. The relay bit says the frame is a repeat of one the device heard
+# from another, not a press of its own.
+#
+# The 916 MHz sensors send the same 48 bits as FSK at 160 and 320 us, which
+# this description's timing does not cover.
+#
+# The timings here are measured off the captures rather than copied from
+# rtl_433's nominal 175 and 340. WaveShark cuts those recordings into far
+# more bursts than there are frames and reads none of them
+# (v0l/waveshark#149), so this one is vector-checked rather than read off
+# the air.
+#
+# Layout from rtl_433 src/devices/honeywell_wdb.c, checked against the
+# rtl_433_tests honeywell_activlink captures.
+name: Honeywell-ActivLink
+timing: { pwm: [168, 328], sync_us: 492, reset_us: 480 }
+frame: { bits: 48, invert: true, find: rows, copies: 2, row_bits: [48, 49], repeats: 4 }
+check: { kind: parity, over: [0, 47], at: 47 }
+fields:
+  - { name: id, bits: 20, data: int, id: true }
+  - { bits: 4, const: 0 }
+  - { bits: 1, const: 0 }
+  - { name: subtype, bits: 3, data: text, map: { 1: PIR-Motion, 2: Doorbell, 5: Contact } }
+  - { bits: 4, const: 0 }
+  - { bits: 6, const: 0 }
+  - { name: alert, bits: 2, data: text, map: { 0: Normal, 1: High, 2: High, 3: Full } }
+  - { bits: 1, const: 0 }
+  - { name: closed, bits: 1, data: bool, type: bool }
+  - { name: opened, bits: 1, data: bool, type: bool }
+  - { name: knock, bits: 1, data: bool, type: bool }
+  - { name: relay, bits: 1, data: bool, type: bool }
+  - { bits: 1, const: 0 }
+  - { name: battery_ok, bits: 1, data: bool, type: bool, not: true }
+  - { bits: 1, hidden: true }
+vectors:
+  - hex: "8d f5 00 20 00 01"
+    fields: { id: 581456, subtype: Doorbell, alert: Normal, closed: false, opened: false, knock: false, relay: false, battery_ok: true }
+  - hex: "8d f5 00 20 00 10"
+    fields: { id: 581456, subtype: Doorbell, alert: Normal, closed: false, opened: false, knock: true, relay: false, battery_ok: true }
