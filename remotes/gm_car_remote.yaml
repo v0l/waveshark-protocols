@@ -1,0 +1,40 @@
+# General Motors car remote, the ABO1502T fob, 315 MHz: PPM, fourteen bytes
+# at the end of a long wake-up burst, closed by two checks that both come to
+# zero rather than storing a value: the two nibbles of the button byte add
+# to a multiple of sixteen, and all thirteen bytes after the wake-up byte
+# add to a multiple of 256.
+#
+# This one rolls. The sequence number is in the clear and goes up with every
+# press, and the three bytes after it are the rolling code proper, which
+# cannot be produced without the fob's key, so a captured frame does not
+# replay. What is readable is which fob, which button, and how many presses
+# it has sent.
+#
+# The button code is a bit per button. Pressing lock and unlock together
+# sends a fixed code that may be a seed for the rolling code.
+#
+# One fob: the corpus has a single ABO1502T.
+#
+# Layout from rtl_433 src/devices/gm_car_remote.c, checked against the
+# rtl_433_tests general_motors/ABO1502T captures.
+name: GM-ABO1502T
+timing: { ppm: [300, 500], reset_us: 20000 }
+frame: { bits: 112, find: sync, sync: "ff", sync_bits: 8, sync_skip: 0 }
+check:
+  - { kind: nibble_sum, over: [20, 24], at: 16, width: 4, negate: true, init: 0 }
+  - { kind: sum8, over: [8, 104], at: 104, negate: true, init: 0 }
+fields:
+  - { bits: 8, const: 0xff }
+  - { name: id_prefix, bits: 8, data: int }
+  - { bits: 4, hidden: true }
+  - { bits: 1, hidden: true, default: 0 }
+  - { name: button_code, bits: 3, data: int }
+  - { name: id, bits: 32, data: text, type: hex, upper: true, id: true }
+  - { name: sequence_num, bits: 24, data: int }
+  - { name: encrypted, bits: 24, data: text, type: hex, upper: true }
+  - { bits: 8, hidden: true }
+vectors:
+  - hex: "ff 4b e2 db 3b 73 ea 00 00 0b 82 75 44 1a"
+    fields: { id_prefix: 75, button_code: 2, id: "DB3B73EA", sequence_num: 11, encrypted: "827544" }
+  - hex: "ff 4b d3 db 3b 73 ea 00 00 01 b5 57 a5 bd"
+    fields: { id_prefix: 75, button_code: 3, id: "DB3B73EA", sequence_num: 1, encrypted: "B557A5" }

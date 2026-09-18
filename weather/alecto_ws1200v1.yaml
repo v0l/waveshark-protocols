@@ -1,0 +1,36 @@
+# Alecto WS-1200 rain unit, version 1, 433.92 MHz: PWM behind seven one
+# bits, seven bytes with a CRC-8 over all of them. The same family as the
+# Fine Offset WH0530 with a shorter frame.
+#
+# Rain is a running count of bucket tips at 0.3 mm each, sent little endian,
+# absolute and wrapping at 65536, so a receiver has to difference it and
+# notice the wrap. The battery flag sits on top of the temperature's ten
+# bits, and the byte before the CRC has always read ff.
+#
+# The version 2 unit sends 95 bits instead of 63 and is not this
+# description.
+#
+# One unit: the corpus has a single version 1 rain gauge.
+#
+# Layout from rtl_433 src/devices/fineoffset.c, checked against the
+# rtl_433_tests alecto_ws_1200 captures.
+name: Alecto-WS1200v1
+timing: { pwm: [500, 1500], reset_us: 1200, tolerance_us: 160 }
+frame: { bits: 56, find: sync, sync: "fe", sync_bits: 7 }
+check: { kind: crc8, poly: 0x31, init: 0x00, over: [0, 48], at: 48 }
+fields:
+  - { bits: 4, const: 3 }
+  - { name: id, bits: 8, data: int, id: true }
+  - { name: battery_ok, bits: 1, data: bool, type: bool, not: true }
+  - { bits: 1, hidden: true, default: 0 }
+  - { name: temperature_c, bits: 10, data: float, unit: c, scale: 0.1, offset: -40, min: -40, max: 70 }
+  - { bits: 8, hidden: true }
+  - { bits: 8, hidden: true }
+  - { bits: 8, const: 0xff }
+  - { bits: 8, hidden: true }
+  - { name: rain_total_mm, gather: [[32, 40], [24, 32]], data: float, unit: mm, scale: 0.3, round: 1 }
+vectors:
+  - hex: "39 12 85 00 00 ff 10"
+    fields: { id: 145, battery_ok: true, temperature_c: 24.5, rain_total_mm: 0.0 }
+  - hex: "39 12 b4 0a 00 ff 1d"
+    fields: { id: 145, battery_ok: true, temperature_c: 29.2, rain_total_mm: 3.0 }

@@ -1,0 +1,25 @@
+# Fine Offset sensor sold by Telldus and Proove, 433.92 MHz: PWM behind nine
+# one bits, five bytes with a CRC-8. The same five bytes as the WH2 behind a
+# one bit longer preamble.
+#
+# The nibble after the preamble is 4 on every unit seen, the id is the byte
+# straddling the nibble boundary after it, and the temperature is twelve
+# bits of sign and magnitude in tenths.
+#
+# Layout from rtl_433 src/devices/fineoffset.c, checked against the
+# rtl_433_tests fineoffset/fineoffset_telldus_313160 captures.
+name: Fineoffset-TelldusProove
+timing: { pwm: [500, 1500], reset_us: 1200, tolerance_us: 160 }
+frame: { bits: 40, find: sync, sync: "ff80", sync_bits: 9 }
+check: { kind: crc8, poly: 0x31, init: 0x00, over: [0, 32], at: 32 }
+fields:
+  - { bits: 4, const: 4 }
+  - { name: id, bits: 8, data: int, id: true }
+  - { name: temperature_c, bits: 12, data: float, unit: c, type: sign_mag, scale: 0.1, min: -40, max: 70 }
+  - { name: humidity_pct, bits: 8, data: int, unit: pct, max: 100 }
+  - { bits: 8, hidden: true }
+vectors:
+  - hex: "4a 70 f2 35 25"
+    fields: { id: 167, temperature_c: 24.2, humidity_pct: 53 }
+  - hex: "4a 70 f6 33 00"
+    fields: { id: 167, temperature_c: 24.6, humidity_pct: 51 }

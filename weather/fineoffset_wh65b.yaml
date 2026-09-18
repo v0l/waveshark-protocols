@@ -1,0 +1,57 @@
+# Fine Offset WH65B, the outdoor array of the WH65 and WS69 stations, also
+# sold by Ecowitt and Ambient Weather. 915 MHz: FSK at 58 us a chip behind
+# an aa aa preamble and a 2d d4 sync, seventeen bytes closed by a CRC-8 and
+# a sum.
+#
+# Wind direction and wind speed are nine bit values whose top bit lives in
+# the flags byte, so each is gathered from two places. Wind speed is
+# eighths of 0.51 m/s and rain is a count of tips at 0.254 mm, which is the
+# WH65's calibration.
+#
+# The WH24 sends these exact bytes with a different calibration, 1.12 m/s a
+# unit and 0.3 mm a tip, and rtl_433 tells the two apart only by how long
+# the preamble ran before the sync. That is not something a description can
+# see, so a WH24 read by this file would come out with wind and rain scaled
+# for the wrong station.
+#
+# The UV figure is the raw sensor count. Turning it into an index needs a
+# nine step lookup table, which no field expression here can do, so it is
+# reported as it arrives.
+#
+# The two flag bits nothing reads are 0 on one of the arrays in the corpus
+# and 3 on the other, so they are reported raw.
+#
+# Layout from rtl_433 src/devices/fineoffset.c, checked against the
+# rtl_433_tests fineoffset/fineoffset_wh65b captures.
+name: Fineoffset-WH65B
+timing: { nrz: 58, reset_us: 1500 }
+frame: { bits: 136, find: sync, sync: "aa2dd4", sync_bits: 24 }
+check:
+  - { kind: crc8, poly: 0x31, init: 0x00, over: [0, 120], at: 120 }
+  - { kind: sum8, over: [0, 128], at: 128 }
+fields:
+  - { bits: 8, const: 0x24 }
+  - { name: id, bits: 8, data: int, id: true }
+  - { bits: 8, hidden: true }
+  - { bits: 1, hidden: true }
+  - { name: flags, bits: 2, data: int }
+  - { bits: 1, hidden: true }
+  - { name: battery_ok, bits: 1, data: bool, type: bool, not: true }
+  - { bits: 3, hidden: true }
+  - { bits: 8, hidden: true }
+  - { name: humidity_pct, bits: 8, data: int, unit: pct, max: 100 }
+  - { bits: 8, hidden: true }
+  - { name: wind_max_ms, bits: 8, data: float, unit: m_s, scale: 0.51, round: 2, max: 80 }
+  - { name: rain_total_mm, bits: 16, data: float, unit: mm, scale: 0.254, round: 3 }
+  - { name: uv_raw, bits: 16, data: int }
+  - { name: light_lux, bits: 24, data: float, scale: 0.1, round: 1 }
+  - { bits: 8, hidden: true }
+  - { bits: 8, hidden: true }
+  - { name: wind_direction_deg, gather: [[24, 25], [16, 24]], data: int, unit: deg, max: 360 }
+  - { name: temperature_c, gather: [[29, 32], [32, 40]], data: float, unit: c, scale: 0.1, offset: -40, min: -40, max: 60 }
+  - { name: wind_avg_ms, gather: [[27, 28], [48, 56]], data: float, unit: m_s, scale: 0.06375, round: 3, max: 80 }
+vectors:
+  - hex: "24 c3 cf 02 90 4a 0b 02 3a 3b 08 fd 0b f7 ac 29 f0"
+    fields: { id: 195, flags: 0, battery_ok: true, humidity_pct: 74, wind_max_ms: 1.02, rain_total_mm: 3786.378, uv_raw: 2301, light_lux: 78430.0, wind_direction_deg: 207, temperature_c: 25.6, wind_avg_ms: 0.701 }
+  - hex: "24 41 25 62 03 40 36 08 11 51 00 00 01 0e 0a 3d 25"
+    fields: { id: 65, flags: 3, battery_ok: true, humidity_pct: 64, wind_max_ms: 4.08, rain_total_mm: 1125.982, uv_raw: 0, light_lux: 6913.0, wind_direction_deg: 37, temperature_c: 11.5, wind_avg_ms: 3.443 }

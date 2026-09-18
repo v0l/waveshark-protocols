@@ -1,0 +1,42 @@
+# Cotech FT0203 anemometer, also sold as the 18-3676. 433.92 MHz: OOK
+# Manchester at 500 us a chip, nine bytes with a CRC-8 whose starting value
+# is 0xc0.
+#
+# Wind average and gust are tenths of a metre a second, direction is whole
+# degrees. Each of the three has a ninth bit sitting in the byte below the
+# id; only the direction's has ever been seen set, since the sensor would
+# have to read over 25 m/s for the others to matter. The battery bit is the
+# opposite way round from the related Cotech 36-7959: here 1 means good.
+#
+# Worked out in rtl_433 issue #2569 from hand transcribed codes; nobody has
+# ever posted a recording of one, so rtl_433 ships its decoder disabled and
+# this description is checked against those codes rather than read off the
+# air.
+#
+# Layout from rtl_433 src/devices/cotech_ft0203.c, checked against the
+# rtl_433_tests cotech_ft0203 codes.
+name: Cotech-FT0203
+timing: { manchester: [500, 1000], reset_us: 1200 }
+frame: { bits: 72, find: sync, sync: "14", sync_bits: 8, sync_skip: 0 }
+check: { kind: crc8, poly: 0x31, init: 0xc0, over: [0, 64], at: 64 }
+fields:
+  - { bits: 8, const: 0x14 }
+  - { name: id, bits: 11, data: int, id: true }
+  - { name: battery_ok, bits: 1, data: bool, type: bool }
+  - { bits: 1, hidden: true, default: 0 }
+  - { bits: 1, hidden: true }
+  - { bits: 1, hidden: true, default: 0 }
+  - { bits: 1, hidden: true, default: 0 }
+  - { bits: 8, hidden: true }
+  - { bits: 8, hidden: true }
+  - { bits: 8, hidden: true }
+  - { bits: 16, const: 0xffff }
+  - { bits: 8, hidden: true }
+  - { name: wind_avg_ms, gather: [[23, 24], [24, 32]], data: float, unit: m_s, scale: 0.1, round: 1, max: 60 }
+  - { name: wind_max_ms, gather: [[22, 23], [32, 40]], data: float, unit: m_s, scale: 0.1, round: 1, max: 60 }
+  - { name: wind_direction_deg, gather: [[21, 22], [40, 48]], data: int, unit: deg, max: 360 }
+vectors:
+  - hex: "14 9c 60 00 00 b4 ff ff b8"
+    fields: { id: 1251, battery_ok: false, wind_avg_ms: 0.0, wind_max_ms: 0.0, wind_direction_deg: 180 }
+  - hex: "14 9c 64 00 00 3b ff ff b1"
+    fields: { id: 1251, battery_ok: false, wind_avg_ms: 0.0, wind_max_ms: 0.0, wind_direction_deg: 315 }
