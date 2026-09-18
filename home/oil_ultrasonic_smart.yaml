@@ -1,0 +1,35 @@
+# Apollo Ultrasonic Smart liquid monitor and the Watchman and Beckett oil
+# tank sensors that share its frame. 433.92 MHz: Manchester at 500 us behind
+# a 55 55 58 preamble and de-sync, eight bytes with a reflected CRC-8.
+#
+# Depth is centimetres from the sensor down to the liquid, four at the top of
+# its range and around three metres at the bottom, and zero means it could
+# not read. The sensor sends once every half hour, or twice a second while
+# binding, filling or alarming, which is what the rapid flag says. Two bits
+# report the temperature: the unit is too cold to work only when both are
+# clear. The three bits this reports as unknown are the ones rtl_433 masks
+# with 0x0d, so it prints six where this prints seven.
+#
+# One transmitter: the corpus has only the one Apollo, and only as codes,
+# with no recording to read.
+name: Oil-Ultrasonic
+timing: { nrz: 500, reset_us: 9000 }
+frame: { bits: 64, find: sync, sync: "555558", sync_bits: 24, decode: manchester }
+check: { kind: crc8_le, poly: 0x31, init: 0x00, over: [0, 56], at: 56 }
+fields:
+  - { name: id, bits: 32, data: int, id: true }
+  - { bits: 1, const: 0 }
+  - { name: rapid, bits: 1, data: bool, type: bool }
+  - { name: temperature_ok, bits: 2, data: bool, type: bool, at_least: 1 }
+  - { bits: 1, const: 0 }
+  - { name: battery_ok, bits: 1, data: bool, type: bool }
+  - { name: sensor, bits: 2, data: int }
+  - { name: counter, bits: 4, data: int }
+  - { name: unknown, bits: 3, data: int }
+  - { name: depth_cm, bits: 9, data: int, max: 310 }
+  - { bits: 8, hidden: true }
+vectors:
+  - hex: "5b 7b 71 81 56 5e 28 fc"
+    fields: { id: 1534816641, rapid: true, temperature_ok: true, battery_ok: true, sensor: 2, counter: 5, unknown: 7, depth_cm: 40 }
+  - hex: "5b 7b 71 81 56 5e 3c 00"
+    fields: { id: 1534816641, rapid: true, temperature_ok: true, battery_ok: true, sensor: 2, counter: 5, unknown: 7, depth_cm: 60 }

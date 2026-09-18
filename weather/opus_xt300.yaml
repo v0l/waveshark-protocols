@@ -1,0 +1,28 @@
+# Opus XT300 soil moisture sensor, also sold as the Imagintronix XT300 and
+# labelled XH300 on its display. 433.92 MHz: PWM, six bytes with a sum of
+# the middle four in the last one.
+#
+# Moisture is a plain percentage, five at dry and ninety nine soaked, and
+# temperature is whole degrees offset by forty. There is no transmitter id,
+# only the channel dial, so a receiver cannot tell two of these apart. The
+# fifth byte is always ff and is thought to be spare.
+#
+# Layout from rtl_433 src/devices/opus_xt300.c, checked against the
+# rtl_433_tests Opus-XT300 captures.
+name: Opus-XT300
+timing: { pwm: [544, 932], reset_us: 31000, tolerance_us: 300 }
+frame: { bits: 48, find: rows, copies: 2, row_bits: [48, 49], repeats: 2 }
+check: { kind: sum8, over: [8, 40], at: 40 }
+fields:
+  - { bits: 8, const: 0xff }
+  - { bits: 6, const: 0x15 }
+  - { name: channel, bits: 2, data: int }
+  - { name: moisture_pct, bits: 8, data: int, unit: pct, max: 100 }
+  - { name: temperature_c, bits: 8, data: int, unit: c, offset: -40, min: -40, max: 65 }
+  - { bits: 8, const: 0xff }
+  - { bits: 8, hidden: true }
+vectors:
+  - hex: "ff 56 63 3d ff f5"
+    fields: { channel: 2, moisture_pct: 99, temperature_c: 21 }
+  - hex: "ff 55 05 41 ff 9a"
+    fields: { channel: 1, moisture_pct: 5, temperature_c: 25 }

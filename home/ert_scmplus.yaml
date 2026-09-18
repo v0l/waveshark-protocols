@@ -1,0 +1,32 @@
+# Itron ERT SCM+, the sixteen byte successor to the SCM meter reading.
+# 912.6 MHz: Manchester at 30 us a chip behind a 16 a3 1e sync, closed by a
+# CRC-16 with polynomial 0x1021 and the unusual starting value 0x0971.
+#
+# The last byte of the sync is the protocol id, so it stays in the frame and
+# is where the CRC starts. The low nibble of the endpoint type says what kind
+# of meter is talking: 4, 5, 7 and 8 are electricity, 2 and 9 gas, 11 and 12
+# water. Consumption is a raw dial reading, whole kilowatt hours on some
+# meters and tens of watt hours on others, so the scale is a property of the
+# meter and not of the frame.
+#
+# Both vectors are the same water meter; the corpus has only the one.
+#
+# Layout from rtl_433 src/devices/scmplus.c, checked against the
+# rtl_433_tests scmplus captures.
+name: SCMplus
+timing: { manchester: [30, 60], reset_us: 63 }
+frame: { bits: 128, find: sync, sync: "16a31e", sync_bits: 24, sync_skip: 0 }
+check: { kind: crc16, poly: 0x1021, init: 0x0971, over: [16, 112], at: 112 }
+fields:
+  - { bits: 16, const: 0x16a3 }
+  - { name: protocol_id, bits: 8, data: int, in: [0x1e] }
+  - { name: endpoint_type, bits: 8, data: int }
+  - { name: id, bits: 32, data: int, id: true }
+  - { name: consumption, bits: 32, data: int }
+  - { name: tamper, bits: 16, data: int }
+  - { bits: 16, hidden: true }
+vectors:
+  - hex: "16 a3 1e ab 04 10 d3 5b 00 00 1a e3 49 00 39 be"
+    fields: { protocol_id: 30, endpoint_type: 171, id: 68211547, consumption: 6883, tamper: 18688 }
+  - hex: "16 a3 1e ab 04 10 d3 5b 00 00 19 fd 49 00 fa 00"
+    fields: { protocol_id: 30, endpoint_type: 171, id: 68211547, consumption: 6653, tamper: 18688 }

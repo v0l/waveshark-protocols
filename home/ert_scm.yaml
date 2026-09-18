@@ -1,0 +1,33 @@
+# Itron ERT Standard Consumption Message, the 96 bit meter reading that
+# electricity, gas and water meters in North America broadcast for drive-by
+# reading. 912 MHz: Manchester at 30 us a chip, closed by a CRC-16 with the
+# unusual polynomial 0x6f63.
+#
+# The sync and preamble stay in the frame because the CRC covers from the
+# third byte on and the meter id takes its top two bits out of the byte the
+# preamble ends in. Consumption is a raw dial reading whose units depend on
+# the meter, so it is reported as it arrives. The tamper fields count
+# physical and encoder tamper events the meter has seen.
+#
+# Layout from rtl_433 src/devices/ert_scm.c, checked against the
+# rtl_433_tests ert/scm captures.
+name: ERT-SCM
+timing: { manchester: [30, 60], reset_us: 63 }
+frame: { bits: 96, find: sync, sync: "015306", sync_bits: 21, sync_skip: 0 }
+check: { kind: crc16, poly: 0x6f63, init: 0x0000, over: [16, 80], at: 80 }
+fields:
+  - { bits: 21, const: 0x2a60 }
+  - { bits: 2, hidden: true }
+  - { name: reserved, bits: 1, data: bool, type: bool }
+  - { name: physical_tamper, bits: 2, data: int }
+  - { name: ert_type, bits: 4, data: int }
+  - { name: encoder_tamper, bits: 2, data: int }
+  - { name: consumption, bits: 24, data: int }
+  - { bits: 24, hidden: true }
+  - { bits: 16, hidden: true }
+  - { name: id, gather: [[21, 23], [56, 80]], data: int, id: true }
+vectors:
+  - hex: "01 53 06 f0 08 95 18 40 ea 0c 10 1a"
+    fields: { id: 54585868, reserved: false, physical_tamper: 3, ert_type: 12, encoder_tamper: 0, consumption: 562456 }
+  - hex: "01 53 06 b0 0b 17 ea 5b eb c9 db fc"
+    fields: { id: 56355785, reserved: false, physical_tamper: 2, ert_type: 12, encoder_tamper: 0, consumption: 727018 }
