@@ -1,0 +1,35 @@
+# Auriol AFT 77 B2 thermometer, sold at Lidl. 433.92 MHz: PPM, 68 bits sent
+# at least three times after nine long sync pulses, closed by a sum and by
+# an eight bit LFSR digest with generator 0x83 and key 0xec.
+#
+# Both checks cover the frame with its leading nibble dropped, which is why
+# they start at bit four: the sensor aligns its bytes one nibble later than
+# it sends them. Temperature is three BCD digits in tenths of a degree with
+# its own sign bit above them, not a signed number.
+#
+# Layout from rtl_433 src/devices/auriol_aft77b2.c, checked against the
+# rtl_433_tests auriol/Auriol_AFT77B2 captures.
+name: Auriol-AFT77B2
+timing: { ppm: [500, 920], reset_us: 2275, tolerance_us: 200 }
+frame: { bits: 68, find: rows, copies: 2, row_bits: [68, 69], repeats: 3 }
+check:
+  - { kind: sum8, over: [4, 52], at: 52 }
+  - { kind: lfsr8, gen: 0x83, key: 0xec, over: [4, 52], at: 60 }
+fields:
+  - { bits: 4, const: 0xa }
+  - { bits: 4, const: 0x5 }
+  - { bits: 4, const: 0xc }
+  - { name: id, bits: 8, data: int, id: true }
+  - { bits: 4, const: 0 }
+  - { name: flags, bits: 4, data: int }
+  - { name: temperature_negative, bits: 1, data: bool, type: bool }
+  - { bits: 3, hidden: true, default: 0 }
+  - { name: temperature_c, bits: 12, type: bcd, sign: 28, data: float, unit: c, scale: 0.1, min: -40, max: 70 }
+  - { bits: 8, const: 0 }
+  - { bits: 8, hidden: true }
+  - { bits: 8, hidden: true }
+vectors:
+  - hex: "a5 c2 b0 20 20 10 08 c3 70"
+    fields: { id: 43, flags: 2, temperature_negative: false, temperature_c: 20.1 }
+  - hex: "a5 cf 80 20 17 50 0c cb 70"
+    fields: { id: 248, flags: 2, temperature_negative: false, temperature_c: 17.5 }

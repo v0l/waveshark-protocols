@@ -1,0 +1,30 @@
+# Fine Offset WH32B and WN32B temperature, humidity and pressure sensor,
+# 915 MHz: FSK at 58 us a chip behind an aa aa preamble and a 2d d4 sync,
+# eight bytes closed by a sum. It sends two copies in one transmission.
+#
+# The same type nibble and the same seven bytes as the WH25, but the eighth
+# byte, which the WH25 fills with a nibble swapped exclusive or, is left at
+# zero here. That is the only thing on the air that separates them, so it is
+# a constant in this description.
+#
+# Layout from rtl_433 src/devices/fineoffset.c, checked against the
+# rtl_433_tests fineoffset/fineoffset_wh32b captures.
+name: Fineoffset-WH32B
+timing: { nrz: 58, reset_us: 1500 }
+frame: { bits: 64, find: sync, sync: "aa2dd4", sync_bits: 24 }
+check: { kind: sum8, over: [0, 48], at: 48 }
+fields:
+  - { bits: 4, const: 0xe }
+  - { name: id, bits: 8, data: int, id: true }
+  - { name: battery_ok, bits: 1, data: bool, type: bool, not: true }
+  - { name: reading_invalid, bits: 1, data: bool, type: bool }
+  - { name: temperature_c, bits: 10, data: float, unit: c, scale: 0.1, offset: -40, min: -40, max: 60 }
+  - { name: humidity_pct, bits: 8, data: int, unit: pct, max: 100 }
+  - { name: pressure_hpa, bits: 16, data: float, unit: hpa, scale: 0.1, min: 800, max: 1100 }
+  - { bits: 8, hidden: true }
+  - { bits: 8, const: 0x00 }
+vectors:
+  - hex: "e4 52 7a 29 27 39 39 00"
+    fields: { id: 69, battery_ok: true, reading_invalid: false, temperature_c: 23.4, humidity_pct: 41, pressure_hpa: 1004.1 }
+  - hex: "e9 f2 7b 2a 27 3b e2 00"
+    fields: { id: 159, battery_ok: true, reading_invalid: false, temperature_c: 23.5, humidity_pct: 42, pressure_hpa: 1004.3 }

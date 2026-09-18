@@ -1,0 +1,34 @@
+# Fine Offset WH0290 particulate sensor, also the Ecowitt WH41 and WH43,
+# 433.92 or 915 MHz: FSK at 58 us a chip behind an aa aa preamble and a
+# 2d d4 sync, eight bytes closed by a CRC-8 and a sum.
+#
+# The PM2.5 and PM10 readings are fourteen bit values in tenths of a
+# microgram per cubic metre; the PM10 one is an estimate the sensor computes
+# from the same optical count, not a second measurement. Battery is three
+# bits of bar count out of five, split so that the top bit sits above the
+# PM2.5 value and the bottom two above the PM10 one.
+#
+# Layout from rtl_433 src/devices/fineoffset.c, checked against the
+# rtl_433_tests fineoffset/fineoffset_wh0290 and ecowitt/WH41 captures.
+name: Fineoffset-WH0290
+timing: { nrz: 58, reset_us: 1500 }
+frame: { bits: 64, find: sync, sync: "aa2dd4", sync_bits: 24 }
+check:
+  - { kind: crc8, poly: 0x31, init: 0x00, over: [0, 48], at: 48 }
+  - { kind: sum8, over: [0, 56], at: 56 }
+fields:
+  - { name: family, bits: 8, data: int, in: [0x41, 0x42] }
+  - { name: id, bits: 8, data: int, id: true }
+  - { name: unknown1, bits: 1, data: bool, type: bool }
+  - { bits: 1, hidden: true, default: 0 }
+  - { name: pm2_5_ug_m3, bits: 14, data: float, scale: 0.1 }
+  - { bits: 2, hidden: true, default: 0 }
+  - { name: estimated_pm10_ug_m3, bits: 14, data: float, scale: 0.1 }
+  - { bits: 8, hidden: true }
+  - { bits: 8, hidden: true }
+  - { name: battery_bars, gather: [[17, 18], [32, 34]], data: int, max: 5 }
+vectors:
+  - hex: "42 cc 40 64 40 6e e4 44"
+    fields: { family: 66, id: 204, unknown1: false, pm2_5_ug_m3: 10.0, estimated_pm10_ug_m3: 11.0, battery_bars: 5 }
+  - hex: "41 c7 41 ae 01 c2 f9 b3"
+    fields: { family: 65, id: 199, unknown1: false, pm2_5_ug_m3: 43.0, estimated_pm10_ug_m3: 45.0, battery_bars: 4 }

@@ -1,0 +1,53 @@
+# Fine Offset WS90 seven in one sensor array, also sold as the Ecowitt WS90:
+# FSK at 58 us a chip behind an aa aa preamble and a 2d d4 sync, thirty two
+# bytes closed by a CRC-8 and a sum over everything including that CRC.
+#
+# The WS90 is a WS80 with a piezoelectric rain gauge, and the first fourteen
+# bytes are the same on both. Temperature, wind speed, bearing and gust are
+# nine or ten bit values whose top bits live in the flags byte, so each is
+# gathered from two places. The array has no barometer, so the pressure
+# bytes always read 3f ff. Several bytes still have no known meaning and are
+# written back as they were seen.
+#
+# Layout from rtl_433 src/devices/fineoffset_ws90.c, checked against the
+# rtl_433_tests fineoffset_ws90 captures.
+name: Fineoffset-WS90
+timing: { nrz: 58, reset_us: 3000 }
+frame: { bits: 256, find: sync, sync: "aaaa2dd4", sync_bits: 32 }
+check:
+  - { kind: crc8, poly: 0x31, init: 0x00, over: [0, 240], at: 240 }
+  - { kind: sum8, over: [0, 248], at: 248 }
+fields:
+  - { bits: 8, const: 0x90 }
+  - { name: id, bits: 24, data: int, id: true }
+  - { name: light_lux, bits: 16, data: int, scale: 10 }
+  - { name: battery_mv, bits: 8, data: int, unit: mv, scale: 20 }
+  - { name: flags, bits: 8, data: int }
+  - { bits: 8, hidden: true }
+  - { name: humidity_pct, bits: 8, data: int, unit: pct, max: 100 }
+  - { bits: 8, hidden: true }
+  - { bits: 8, hidden: true }
+  - { bits: 8, hidden: true }
+  - { name: uv_index, bits: 8, data: float, scale: 0.1 }
+  - { bits: 16, const: 0x3fff }
+  - { bits: 3, hidden: true, default: 5 }
+  - { name: rain_start, bits: 1, data: bool, type: bool }
+  - { bits: 4, hidden: true, default: 9 }
+  - { bits: 8, hidden: true, default: 0x80 }
+  - { bits: 8, hidden: true, default: 0x02 }
+  - { name: rain_total_mm, bits: 16, data: float, unit: mm, scale: 0.1 }
+  - { bits: 2, hidden: true, default: 0 }
+  - { name: supercap_v, bits: 6, data: float, unit: v, scale: 0.1 }
+  - { name: unknown, bits: 56, data: text, type: hex }
+  - { name: firmware, bits: 8, data: int }
+  - { bits: 8, hidden: true }
+  - { bits: 8, hidden: true }
+  - { name: temperature_c, gather: [[62, 72]], data: float, unit: c, scale: 0.1, offset: -40, min: -40, max: 70 }
+  - { name: wind_avg_ms, gather: [[59, 60], [80, 88]], data: float, unit: m_s, scale: 0.1, max: 60 }
+  - { name: wind_direction_deg, gather: [[58, 59], [88, 96]], data: int, unit: deg, max: 360 }
+  - { name: wind_max_ms, gather: [[57, 58], [96, 104]], data: float, unit: m_s, scale: 0.1, max: 80 }
+vectors:
+  - hex: "90 01 2f 58 16 32 9c a2 c5 3f 00 32 00 28 3f ff a9 80 02 02 3c 35 da 2f ff ef fe 00 00 a1 54 c2"
+    fields: { id: 77656, light_lux: 56820, battery_mv: 3120, flags: 162, humidity_pct: 63, uv_index: 4.0, rain_start: false, rain_total_mm: 57.2, supercap_v: 5.3, unknown: "da2fffeffe0000", firmware: 161, temperature_c: 30.9, wind_avg_ms: 0.0, wind_direction_deg: 306, wind_max_ms: 0.0 }
+  - hex: "90 01 2f 58 09 7b 9c a2 ce 3a 05 39 06 0a 3f ff a9 80 02 02 3c 35 da 2f ff df fd 00 00 a1 23 b4"
+    fields: { id: 77656, light_lux: 24270, battery_mv: 3120, flags: 162, humidity_pct: 58, uv_index: 1.0, rain_start: false, rain_total_mm: 57.2, supercap_v: 5.3, unknown: "da2fffdffd0000", firmware: 161, temperature_c: 31.8, wind_avg_ms: 0.5, wind_direction_deg: 313, wind_max_ms: 0.6 }

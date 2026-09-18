@@ -1,0 +1,38 @@
+# ThermoPro TP28b long range BBQ thermometer, 915 MHz: FSK at 105 us a chip
+# behind a d2 aa 2d d4 sync, seventeen bytes with a sum over the sixteen
+# before it. Two probes, each sending its reading and its high and low alarm
+# points.
+#
+# Every temperature is a little endian four digit BCD in tenths of a degree,
+# always Celsius on the air whatever the display is set to, so the low byte
+# is read after the high one. The status flags are not fully worked out:
+# 0x2000 is a Celsius display, 0x0400 an unacknowledged alarm, 0x0020 probe
+# one in alarm, 0x0004 probe two in alarm.
+#
+# Layout from rtl_433 src/devices/thermopro_tp28b.c, checked against the
+# rtl_433_tests thermopro_tp28b captures.
+name: ThermoPro-TP28b
+timing: { nrz: 105, reset_us: 5500 }
+frame: { bits: 136, find: sync, sync: "d2aa2dd4", sync_bits: 32 }
+check: { kind: sum8, over: [0, 128], at: 128 }
+fields:
+  - { bits: 16, hidden: true }
+  - { bits: 16, hidden: true }
+  - { bits: 16, hidden: true }
+  - { bits: 16, hidden: true }
+  - { bits: 16, hidden: true }
+  - { bits: 16, hidden: true }
+  - { name: flags, bits: 16, data: int }
+  - { name: id, bits: 16, data: int, id: true }
+  - { bits: 8, hidden: true }
+  - { name: temperature_1_c, gather: [[8, 16], [0, 8]], data: float, unit: c, type: bcd, scale: 0.1, max: 400 }
+  - { name: alarm_high_1_c, gather: [[24, 32], [16, 24]], data: float, unit: c, type: bcd, scale: 0.1, max: 400 }
+  - { name: alarm_low_1_c, gather: [[40, 48], [32, 40]], data: float, unit: c, type: bcd, scale: 0.1, max: 400 }
+  - { name: temperature_2_c, gather: [[56, 64], [48, 56]], data: float, unit: c, type: bcd, scale: 0.1, max: 400 }
+  - { name: alarm_high_2_c, gather: [[72, 80], [64, 72]], data: float, unit: c, type: bcd, scale: 0.1, max: 400 }
+  - { name: alarm_low_2_c, gather: [[88, 96], [80, 88]], data: float, unit: c, type: bcd, scale: 0.1, max: 400 }
+vectors:
+  - hex: "25 02 56 06 00 00 75 07 56 06 00 00 a6 96 6d 70 74"
+    fields: { id: 28016, flags: 42646, temperature_1_c: 22.5, alarm_high_1_c: 65.6, alarm_low_1_c: 0.0, temperature_2_c: 77.5, alarm_high_2_c: 65.6, alarm_low_2_c: 0.0 }
+  - hex: "46 10 56 06 00 00 30 09 56 06 00 00 a6 b6 6d 70 80"
+    fields: { id: 28016, flags: 42678, temperature_1_c: 104.6, alarm_high_1_c: 65.6, alarm_low_1_c: 0.0, temperature_2_c: 93.0, alarm_high_2_c: 65.6, alarm_low_2_c: 0.0 }

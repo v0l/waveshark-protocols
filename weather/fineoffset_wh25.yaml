@@ -1,0 +1,35 @@
+# Fine Offset WH25 temperature, humidity and pressure sensor, 868 or 915 MHz:
+# FSK at 58 us a chip behind an aa aa preamble and a 2d d4 sync, eight bytes
+# closed by a sum and by an exclusive or whose nibbles are swapped where it
+# is stored.
+#
+# The type nibble is 0xe on this one. The WH32B sends the same eight bytes
+# under the same type nibble but leaves the exclusive or out, so it fails
+# the second check here and needs its own description; the older WH32 sends
+# type 0xd and has no barometer.
+#
+# Both vectors come from the same sensor; the corpus has only one WH25.
+#
+# Layout from rtl_433 src/devices/fineoffset.c, checked against the
+# rtl_433_tests fineoffset/fineoffset_wh25 captures.
+name: Fineoffset-WH25
+timing: { nrz: 58, reset_us: 1500 }
+frame: { bits: 64, find: sync, sync: "aa2dd4", sync_bits: 24 }
+check:
+  - { kind: sum8, over: [0, 48], at: 48 }
+  - { kind: xor8, over: [0, 48], at: 56, swap: true }
+fields:
+  - { bits: 4, const: 0xe }
+  - { name: id, bits: 8, data: int, id: true }
+  - { name: battery_ok, bits: 1, data: bool, type: bool, not: true }
+  - { name: reading_invalid, bits: 1, data: bool, type: bool }
+  - { name: temperature_c, bits: 10, data: float, unit: c, scale: 0.1, offset: -40, min: -40, max: 60 }
+  - { name: humidity_pct, bits: 8, data: int, unit: pct, max: 100 }
+  - { name: pressure_hpa, bits: 16, data: float, unit: hpa, scale: 0.1, min: 800, max: 1100 }
+  - { bits: 8, hidden: true }
+  - { bits: 8, hidden: true }
+vectors:
+  - hex: "e5 02 78 39 27 1b da a9"
+    fields: { id: 80, battery_ok: true, reading_invalid: false, temperature_c: 23.2, humidity_pct: 57, pressure_hpa: 1001.1 }
+  - hex: "e5 02 81 24 27 b3 66 6d"
+    fields: { id: 80, battery_ok: true, reading_invalid: false, temperature_c: 24.1, humidity_pct: 36, pressure_hpa: 1016.3 }
