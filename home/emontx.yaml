@@ -1,0 +1,56 @@
+# OpenEnergyMonitor emonTx energy monitor, 433.92 MHz: the JeeLib RF12
+# packet format, FSK at about 20 us a chip behind an aa aa aa preamble,
+# thirty three bytes closed by a CRC-16 and a 0xaa postamble.
+#
+# Four current transformer readings in watts, the mains RMS voltage in
+# hundredths of a volt, six optional temperature probes and a 32 bit pulse
+# count, all little endian. A probe that is not fitted reads 3000, which
+# would be 300 C, and is left unreported.
+#
+# The RFM69 drops the last zero bit of the preamble, so the sync here is the
+# 0x2d start byte and the 0xd2 group byte that follow it rather than the
+# preamble itself.
+#
+# Layout from rtl_433 src/devices/emontx.c, checked against the
+# rtl_433_tests emontx captures. Those recordings hold long runs of zero
+# bits where a probe is missing, which WaveShark's slicer does not get a
+# frame out of (v0l/waveshark#144), so this one is vector-checked rather
+# than read off the air.
+name: emonTx-Energy
+timing: { nrz: 20, reset_us: 1200 }
+frame: { bits: 264, find: sync, sync: "2dd2", sync_bits: 16, sync_skip: 0 }
+check: { kind: crc16_le, poly: 0xa001, init: 0xffff, over: [8, 240], at: 240, swap: true }
+fields:
+  - { bits: 8, const: 0x2d }
+  - { bits: 8, const: 0xd2 }
+  - { bits: 3, const: 0 }
+  - { name: node, bits: 5, data: int, id: true }
+  - { bits: 8, const: 0x1a }
+  - { bits: 64, hidden: true }
+  - { bits: 16, hidden: true }
+  - { bits: 16, hidden: true, default: 0xb80b }
+  - { bits: 16, hidden: true, default: 0xb80b }
+  - { bits: 16, hidden: true, default: 0xb80b }
+  - { bits: 16, hidden: true, default: 0xb80b }
+  - { bits: 16, hidden: true, default: 0xb80b }
+  - { bits: 16, hidden: true, default: 0xb80b }
+  - { bits: 32, hidden: true }
+  - { bits: 16, hidden: true }
+  - { bits: 8, const: 0xaa }
+  - { name: ct1, gather: [[40, 48], [32, 40]], type: int, data: int, unit: w }
+  - { name: ct2, gather: [[56, 64], [48, 56]], type: int, data: int, unit: w }
+  - { name: ct3, gather: [[72, 80], [64, 72]], type: int, data: int, unit: w }
+  - { name: ct4, gather: [[88, 96], [80, 88]], type: int, data: int, unit: w }
+  - { name: voltage_v, gather: [[104, 112], [96, 104]], data: float, unit: v, scale: 0.01, round: 2, max: 300 }
+  - { name: temperature_1_c, gather: [[120, 128], [112, 120]], data: float, unit: c, scale: 0.1, omit_if: 3000 }
+  - { name: temperature_2_c, gather: [[136, 144], [128, 136]], data: float, unit: c, scale: 0.1, omit_if: 3000 }
+  - { name: temperature_3_c, gather: [[152, 160], [144, 152]], data: float, unit: c, scale: 0.1, omit_if: 3000 }
+  - { name: temperature_4_c, gather: [[168, 176], [160, 168]], data: float, unit: c, scale: 0.1, omit_if: 3000 }
+  - { name: temperature_5_c, gather: [[184, 192], [176, 184]], data: float, unit: c, scale: 0.1, omit_if: 3000 }
+  - { name: temperature_6_c, gather: [[200, 208], [192, 200]], data: float, unit: c, scale: 0.1, omit_if: 3000 }
+  - { name: pulse, gather: [[232, 240], [224, 232], [216, 224], [208, 216]], data: int }
+vectors:
+  - hex: "2d d2 08 1a 07 00 00 00 00 00 00 00 71 5c b8 0b b8 0b b8 0b b8 0b b8 0b b8 0b 01 00 00 00 39 9f aa"
+    fields: { node: 8, ct1: 7, ct2: 0, ct3: 0, ct4: 0, voltage_v: 236.65, pulse: 1 }
+  - hex: "2d d2 08 1a 84 04 01 00 35 04 3d 00 ce 5d b8 0b b8 0b b8 0b b8 0b b8 0b b8 0b 3d 04 00 00 12 a6 aa"
+    fields: { node: 8, ct1: 1156, ct2: 1, ct3: 1077, ct4: 61, voltage_v: 240.14, pulse: 1085 }

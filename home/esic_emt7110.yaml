@@ -1,0 +1,31 @@
+# ESIC EMT7110 plug-in power meter, the sender for the EMR7370 display.
+# 868.28 MHz: FSK at 104 us a chip behind an aa aa preamble and a 2d d4
+# sync, twelve bytes whose sum including the last one is zero.
+#
+# Power comes in half watts, current in milliamps, voltage in half volts
+# offset by 128 V, and the energy total in tens of watt hours. Each
+# transmission is two copies 14 ms apart.
+#
+# Both vectors come from the same meter; it is the only one in the corpus.
+#
+# Layout from rtl_433 src/devices/esic_emt7110.c, checked against the
+# rtl_433_tests ESIC-EMT7110_power_meter captures.
+name: ESIC-EMT7110
+timing: { nrz: 104, reset_us: 10000 }
+frame: { bits: 96, find: sync, sync: "aa2dd4", sync_bits: 24 }
+check: { kind: sum8, over: [0, 88], at: 88, negate: true, init: 0 }
+fields:
+  - { name: id, bits: 32, data: int, id: true }
+  - { name: pairing, bits: 1, data: bool, type: bool }
+  - { name: connected, bits: 1, data: bool, type: bool }
+  - { name: power_w, bits: 14, data: float, unit: w, scale: 0.5 }
+  - { name: current_a, bits: 16, data: float, unit: a, scale: 0.001, round: 3 }
+  - { name: voltage_v, bits: 8, data: float, unit: v, scale: 0.5, offset: 128, min: 100, max: 260 }
+  - { bits: 2, hidden: true, default: 1 }
+  - { name: energy_kwh, bits: 14, data: float, unit: kwh, scale: 0.01 }
+  - { bits: 8, hidden: true }
+vectors:
+  - hex: "25 6a 54 87 40 00 00 00 cb 40 00 4b"
+    fields: { id: 627725447, pairing: false, connected: true, power_w: 0.0, current_a: 0.0, voltage_v: 229.5, energy_kwh: 0.0 }
+  - hex: "25 6a 54 87 40 00 00 2b ca 40 00 21"
+    fields: { id: 627725447, pairing: false, connected: true, power_w: 0.0, current_a: 0.043, voltage_v: 229.0, energy_kwh: 0.0 }

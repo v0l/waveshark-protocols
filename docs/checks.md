@@ -21,7 +21,8 @@ is not small, the description needs a check, a constant, or an `in:` list.
 | `nibble_sum` | 8 | every covered nibble added |
 | `nibble_xor` | 4 | every covered nibble exclusive-ored |
 | `roll8` | 8 | a per-byte LFSR digest, the key seeded from `gen` at every byte and only shifted |
-| `even_parity` | none | every covered byte has even parity |
+| `even_parity` | none | every covered byte has even parity, or odd with `odd: true` |
+| `parity` | 1 | the covered bits, `step` apart, counted; the stored bit brings the count to even, or odd with `odd: true` |
 | `complement` | the width of `over` | the stored bits are the covered bits inverted |
 
 `over: [from, to]` is in bits with the end exclusive, and must be whole bytes
@@ -30,9 +31,22 @@ stores nothing, like `even_parity`, omits it.
 
 Modifiers, all optional: `xor` on the computed value, `add` on a sum,
 `negate` to take the sum from `init` instead of comparing, `reflect` to store
-low bit first, `swap` to store a byte with its nibbles swapped, and `width`
-where the stored value is narrower than the kind's natural size, as a sum
-stored in six bits is.
+low bit first, `swap` to store the value's halves the other way round (a
+byte's nibbles, a sixteen bit value's bytes), `odd` for an odd parity,
+`step` for a parity that counts every nth bit, and `width` where the stored
+value is narrower than the kind's natural size, as a sum stored in six bits
+is.
+
+`add` and `negate` apply to `sum8` and `nibble_sum`: a meter whose bytes
+including the stored one add up to zero is `negate: true` with `init: 0`, and
+one that folds a fixed byte into the sum is `add: 0x56`.
+
+A `parity` check normally names the bit it is stored in, and `over` then
+covers everything before it. Where the stored bits sit inside the span they
+cover, as the two interleaved parities of a WT450 do, leave `at` out and the
+count over the whole span is what has to come out even. Two of them with
+`step: 2`, one starting at bit 0 and one at bit 1, are how a frame guards its
+even and odd numbered bits separately.
 
 ## Working out which one
 

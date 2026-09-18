@@ -120,7 +120,9 @@ computes and how to work out which one a device uses.
 | `negate` | the sum is taken from `init` rather than compared as it is |
 | `width` | width of the stored value where the kind does not fix it |
 | `reflect` | the value is stored low bit first, and a nibble sum adds nibbles as they read reversed |
-| `swap` | an eight bit value is stored with its nibbles swapped |
+| `swap` | the stored value's halves the other way round: a byte's nibbles, a sixteen bit value's bytes |
+| `odd` | the parity is odd rather than even |
+| `step` | a parity counts every nth covered bit, for a frame that guards its even and odd bits apart |
 | `when`, `unless` | the check applies only when the named fields read so |
 
 A frame with a passing check is reported as verified. A frame with no check

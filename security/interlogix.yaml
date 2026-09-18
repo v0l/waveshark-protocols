@@ -1,0 +1,42 @@
+# Interlogix and GE security sensors, also sold as ESL and by ADT: door
+# contacts, motion detectors, glass break sensors, smoke alarms and keyfobs.
+# 319.5 MHz: PPM, 46 bits behind a preamble that ends in a single one bit,
+# closed by two parity bits, one over the frame's even numbered bits and one
+# over its odd numbered ones. Both are odd parity.
+#
+# Two bits of parity let roughly a quarter of noise through, which is why
+# the device type is held to the values the patent lists; a frame claiming
+# anything else is not this protocol.
+#
+# The serial is sent least significant byte first with every byte's bits
+# reversed, which is one reversal of the whole 24 bit field. The two status
+# bytes carry a latch bit and a debounced level for each of the five inputs;
+# the five named switches are the debounced ones, and on a keyfob the same
+# bits mean which button was pressed instead.
+#
+# Layout from rtl_433 src/devices/interlogix.c, checked against the
+# rtl_433_tests interlogix captures.
+name: Interlogix-Security
+timing: { ppm: [122, 244], reset_us: 500 }
+frame: { bits: 46, find: sync, sync: "01", sync_bits: 8 }
+check:
+  - { kind: parity, over: [0, 40], step: 2, at: 40, odd: true }
+  - { kind: parity, over: [1, 40], step: 2, at: 41, odd: true }
+fields:
+  - { name: id, bits: 24, data: text, type: hex, reflect: true, id: true }
+  - { name: status, bits: 8, data: int }
+  - { name: status2, bits: 8, data: int }
+  - { bits: 2, hidden: true }
+  - { name: tail, bits: 4, data: int }
+  - { name: subtype, at: 20, bits: 4, reflect: true, data: text, map: { 0xa: contact, 0xf: keyfob, 0x4: motion, 0x6: heat, 0x9: glass, 0xd: glass, 0x1: water, 0x2: smoke } }
+  - { name: battery_ok, at: 27, bits: 1, data: bool, type: bool, not: true }
+  - { name: switch1_open, at: 29, bits: 1, data: bool, type: bool }
+  - { name: switch2_open, at: 31, bits: 1, data: bool, type: bool }
+  - { name: switch3_open, at: 33, bits: 1, data: bool, type: bool }
+  - { name: switch4_open, at: 35, bits: 1, data: bool, type: bool }
+  - { name: switch5_open, at: 37, bits: 1, data: bool, type: bool }
+vectors:
+  - hex: "e0 e5 52 81 14 a0"
+    fields: { id: "4aa707", subtype: motion, status: 129, status2: 20, battery_ok: true, switch1_open: false, switch2_open: true, switch3_open: false, switch4_open: true, switch5_open: true, tail: 8 }
+  - hex: "b6 08 e5 cd 15 b8"
+    fields: { id: "a7106d", subtype: contact, status: 205, status2: 21, battery_ok: true, switch1_open: true, switch2_open: true, switch3_open: false, switch4_open: true, switch5_open: true, tail: 14 }
