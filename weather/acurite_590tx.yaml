@@ -1,0 +1,30 @@
+# Acurite 590TX thermometer, 433.92 MHz: PPM, 25 bits sent at least three
+# times, closed by nothing but odd parity over the first ten of them.
+#
+# The id is the whole first byte with its low bit, the battery flag, masked
+# off, which is why it always reads even. Temperature is a signed twelve bit
+# count of tenths of a degree offset by fifty.
+#
+# The sensor can carry a humidity probe, and rtl_433 guesses a humidity
+# reading from the same twelve bits when they land between 0 and 100. That
+# is a guess with nothing on the air to support it, so this reports the
+# temperature only.
+#
+# Layout from rtl_433 src/devices/acurite.c, checked against the
+# rtl_433_tests acurite/Acurite_590TX captures.
+name: Acurite-590TX
+timing: { ppm: [500, 1500], reset_us: 3500 }
+frame: { bits: 25, find: rows, copies: 2, row_bits: [25, 26], repeats: 3 }
+check: { kind: parity, over: [0, 10], odd: true }
+fields:
+  - { name: id, bits: 7, data: int, scale: 2, id: true }
+  - { name: battery_ok, bits: 1, data: bool, type: bool }
+  - { name: flags, bits: 2, data: int }
+  - { name: channel, bits: 2, data: int }
+  - { name: temperature_c, bits: 12, type: int, data: float, unit: c, scale: 0.1, offset: -50, min: -40, max: 70 }
+  - { bits: 1, const: 0 }
+vectors:
+  - hex: "58 d3 1b 00"
+    fields: { id: 88, battery_ok: false, flags: 3, channel: 1, temperature_c: 29.5 }
+  - hex: "5e d3 1e 00"
+    fields: { id: 94, battery_ok: false, flags: 3, channel: 1, temperature_c: 29.8 }

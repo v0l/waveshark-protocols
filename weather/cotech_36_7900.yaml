@@ -1,0 +1,35 @@
+# Cotech 36-7900 rain gauge, 433.92 MHz: PPM, 60 bits repeated about
+# thirteen times a transmission.
+#
+# There is no checksum. What stands in for one is a twelve bit marker that
+# reads ab8 on every capture and a twenty four bit run between the
+# temperature and the rain counter that has been zero in every one of the
+# sixty six distinct messages seen over five days. The marker may well be a
+# per-device id, but only one of these has ever been recorded, so nothing
+# says which.
+#
+# rtl_433 reports that marker with the temperature's top nibble stuck on the
+# end of it, so its id reads 0xab80 while the temperature is between zero
+# and 25.5 C and would change with the weather. This reports the twelve bits
+# that are actually fixed.
+#
+# The rain counter goes up about forty per bucket tip rather than by one,
+# and nobody has pinned the millimetres per tip, so it is reported raw.
+#
+# One transmitter: the corpus has a single gauge.
+#
+# Layout from rtl_433 src/devices/cotech_36_7900.c, checked against the
+# rtl_433_tests Cotech_36_7900 captures and codes.
+name: Cotech-367900
+timing: { ppm: [1000, 2000], reset_us: 4500 }
+frame: { bits: 60, find: rows, copies: 4, row_bits: [60, 61], repeats: 13 }
+fields:
+  - { name: id, bits: 12, data: int, in: [0xab8], id: true }
+  - { name: temperature_c, bits: 12, type: int, data: float, unit: c, scale: 0.1, min: -40, max: 70 }
+  - { bits: 24, const: 0 }
+  - { name: rain_raw, bits: 12, data: int }
+vectors:
+  - hex: "ab 80 e1 00 00 00 00 00"
+    fields: { id: 2744, temperature_c: 22.5, rain_raw: 0 }
+  - hex: "ab 80 e9 00 00 00 02 70"
+    fields: { id: 2744, temperature_c: 23.3, rain_raw: 39 }

@@ -1,0 +1,43 @@
+# EcoWitt WH40 rain gauge, also sold as the Fine Offset WH5360 and Ecowitt
+# WH5360B. 433.92 MHz: FSK at 56 us a chip behind an aa aa preamble and a
+# 2d d4 sync, nine bytes closed by a CRC-8 and a sum. Same wire format as
+# the WH31E thermo-hygrometer under its own type byte.
+#
+# All the gauge sends is a running count of bucket tips at a tenth of a
+# millimetre each, so a receiver has to difference it to get rainfall and
+# has to notice when it wraps. Battery is the low five bits of the byte
+# above the counter, in tenths of a volt; the top three bits of that byte
+# have only ever read 0b000.
+#
+# A few more bytes follow the sum and carry something that changes between
+# transmissions, which nothing reads and this does not either.
+#
+# One gauge: the corpus has a single WH40.
+#
+# The frame holds runs of sixteen zero bits, which WaveShark's FSK slicer
+# does not get a frame out of (v0l/waveshark#144) even though it reads the
+# WH31B off the same timing, so this one is vector-checked rather than read
+# off the air.
+#
+# Layout from rtl_433 src/devices/ambientweather_wh31e.c, checked against
+# the rtl_433_tests EcoWitt-WH40 captures.
+name: EcoWitt-WH40
+timing: { nrz: 56, reset_us: 1500 }
+frame: { bits: 72, find: sync, sync: "aa2dd4", sync_bits: 24 }
+check:
+  - { kind: crc8, poly: 0x31, init: 0x00, over: [0, 56], at: 56 }
+  - { kind: sum8, over: [0, 64], at: 64 }
+fields:
+  - { bits: 8, const: 0x40 }
+  - { bits: 4, hidden: true, default: 0 }
+  - { name: id, bits: 20, data: int, id: true }
+  - { name: flags, bits: 3, data: int }
+  - { name: battery_v, bits: 5, data: float, unit: v, scale: 0.1, round: 1 }
+  - { name: rain_total_mm, bits: 16, data: float, unit: mm, scale: 0.1, round: 1 }
+  - { bits: 8, hidden: true }
+  - { bits: 8, hidden: true }
+vectors:
+  - hex: "40 00 cd 6f 10 00 00 64 f0"
+    fields: { id: 52591, flags: 0, battery_v: 1.6, rain_total_mm: 0.0 }
+  - hex: "40 00 cd 6f 10 00 29 6a 1f"
+    fields: { id: 52591, flags: 0, battery_v: 1.6, rain_total_mm: 4.1 }

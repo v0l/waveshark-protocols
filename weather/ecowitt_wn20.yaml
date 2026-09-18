@@ -1,0 +1,38 @@
+# EcoWitt WN20 rain gauge, the high sensitivity tipping bucket that reports
+# every 48 seconds. 915 MHz: FSK at 56 us a chip behind an aa aa preamble
+# and a 2d d4 sync, ten bytes closed by a CRC-8 and a sum. Same wire format
+# as the WH31E thermo-hygrometer under its own type byte.
+#
+# The bucket is 0.3 mm a tip but the counter still arrives in tenths of a
+# millimetre, so the reading moves in threes. Battery is a whole byte here,
+# in fiftieths of a volt, for the two AAA cells it runs on. The byte before
+# the CRC has no known meaning.
+#
+# One gauge: the corpus has a single WN20, and every recording of it carries
+# the same frame, so both vectors would be identical and there is one.
+#
+# The frame holds runs of sixteen zero bits, which WaveShark's FSK slicer
+# does not get a frame out of (v0l/waveshark#144) even though it reads the
+# WH31B off the same timing, so this one is vector-checked rather than read
+# off the air.
+#
+# Layout from rtl_433 src/devices/ambientweather_wh31e.c, checked against
+# the rtl_433_tests EcoWitt-WN20 captures.
+name: EcoWitt-WN20
+timing: { nrz: 56, reset_us: 1500 }
+frame: { bits: 80, find: sync, sync: "aa2dd4", sync_bits: 24 }
+check:
+  - { kind: crc8, poly: 0x31, init: 0x00, over: [0, 64], at: 64 }
+  - { kind: sum8, over: [0, 72], at: 72 }
+fields:
+  - { bits: 8, const: 0x20 }
+  - { bits: 8, const: 0 }
+  - { name: id, bits: 16, data: int, id: true }
+  - { name: battery_v, bits: 8, data: float, unit: v, scale: 0.02, round: 2 }
+  - { name: rain_total_mm, bits: 16, data: float, unit: mm, scale: 0.1, round: 1 }
+  - { name: unknown, bits: 8, data: int }
+  - { bits: 8, hidden: true }
+  - { bits: 8, hidden: true }
+vectors:
+  - hex: "20 00 2c 87 98 00 13 04 9e 20"
+    fields: { id: 11399, battery_v: 3.04, rain_total_mm: 1.9, unknown: 4 }

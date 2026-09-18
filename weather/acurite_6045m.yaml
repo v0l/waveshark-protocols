@@ -1,0 +1,47 @@
+# Acurite 6045M lightning detector, 433.92 MHz: the same PWM frame as the
+# 5-in-1, inverted, nine bytes with an additive sum and even parity on every
+# byte between the id and the sum.
+#
+# Temperature, humidity, a running strike count and the distance to the last
+# strike. The active bit says the sensor is listening for strikes rather than
+# just reporting weather, and the RFI bit that it is hearing interference it
+# takes for strikes. The strike count wraps at 255 and the distance is in
+# miles.
+#
+# One vector: the corpus has two recordings of this sensor and both carry
+# the same frame.
+#
+# Layout from rtl_433 src/devices/acurite.c, checked against the
+# rtl_433_tests acurite/Acurite_6045M captures.
+name: Acurite-6045M
+timing: { pwm: [220, 408], sync_us: 620, reset_us: 4000 }
+frame: { bits: 72, invert: true, repeats: 3 }
+check:
+  - { kind: sum8, over: [0, 64], at: 64 }
+  - { kind: even_parity, over: [16, 64] }
+fields:
+  - { name: channel, bits: 2, data: text, in: [0, 2, 3], map: { 0: C, 2: B, 3: A } }
+  - { name: id, bits: 14, data: int, id: true }
+  - { bits: 1, hidden: true }
+  - { name: battery_ok, bits: 1, data: bool, type: bool }
+  - { bits: 6, const: 0x2f }
+  - { bits: 1, hidden: true }
+  - { name: humidity_pct, bits: 7, data: int, unit: pct, max: 100 }
+  - { bits: 1, hidden: true }
+  - { name: active, bits: 1, data: bool, type: bool }
+  - { bits: 1, const: 0 }
+  - { bits: 5, hidden: true }
+  - { bits: 1, hidden: true }
+  - { bits: 7, hidden: true }
+  - { bits: 1, hidden: true }
+  - { bits: 7, hidden: true }
+  - { bits: 1, hidden: true }
+  - { bits: 1, hidden: true }
+  - { name: rfi, bits: 1, data: bool, type: bool }
+  - { name: strike_distance, bits: 5, data: int }
+  - { bits: 8, hidden: true }
+  - { name: temperature_f, gather: [[35, 40], [41, 48]], data: float, unit: f, scale: 0.1, offset: -148, round: 1, min: -40, max: 158 }
+  - { name: strike_count, gather: [[49, 56], [57, 58]], data: int }
+vectors:
+  - hex: "80 97 6f 4b 11 84 5f 0a cf"
+    fields: { channel: B, id: 151, battery_ok: true, humidity_pct: 75, active: false, rfi: false, strike_distance: 10, temperature_f: 70.0, strike_count: 190 }
