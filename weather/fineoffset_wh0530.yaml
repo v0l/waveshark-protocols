@@ -1,0 +1,34 @@
+# Fine Offset WH0530 temperature and rain sensor, also the Agimex Rosenborg
+# 35926. 433.92 MHz: PWM behind seven one bits, eight bytes closed by a
+# CRC-8 and a sum. Two identical copies every 48 seconds.
+#
+# Rain is a running count of bucket tips at 0.3 mm each, sent little endian,
+# absolute and wrapping at 65536, so a receiver has to difference it and
+# notice the wrap. The battery flag sits on top of the temperature's eleven
+# bits. The byte before the CRC has always read ff and may have been meant
+# for humidity.
+#
+# Layout from rtl_433 src/devices/fineoffset.c, checked against the
+# rtl_433_tests fineoffset/fineoffset_wh0530 captures.
+name: Fineoffset-WH0530
+timing: { pwm: [504, 1480], reset_us: 1200, tolerance_us: 160 }
+frame: { bits: 64, find: sync, sync: "fe", sync_bits: 7 }
+check:
+  - { kind: crc8, poly: 0x31, init: 0x00, over: [0, 48], at: 48 }
+  - { kind: sum8, over: [0, 56], at: 56 }
+fields:
+  - { bits: 4, const: 3 }
+  - { name: id, bits: 8, data: int, id: true }
+  - { name: battery_ok, bits: 1, data: bool, type: bool, not: true }
+  - { name: temperature_c, bits: 11, data: float, unit: c, scale: 0.1, offset: -40, min: -40, max: 70 }
+  - { bits: 8, hidden: true }
+  - { bits: 8, hidden: true }
+  - { bits: 8, const: 0xff }
+  - { bits: 8, hidden: true }
+  - { bits: 8, hidden: true }
+  - { name: rain_total_mm, gather: [[32, 40], [24, 32]], data: float, unit: mm, scale: 0.3, round: 1 }
+vectors:
+  - hex: "3d 82 8a 06 00 ff 99 e7"
+    fields: { id: 216, battery_ok: true, temperature_c: 25.0, rain_total_mm: 1.8 }
+  - hex: "3b 7a 41 1f 0b ff a9 c8"
+    fields: { id: 183, battery_ok: false, temperature_c: 17.7, rain_total_mm: 854.1 }

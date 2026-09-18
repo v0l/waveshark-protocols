@@ -1,0 +1,38 @@
+# Inkbird ITH-20R data logger and IBS-P01R pool thermometer, 433.92 MHz:
+# FSK at 100 us a chip behind a very long aa preamble and a 2d d4 sync,
+# eighteen bytes closed by a CRC-16 with polynomial 0x8005 and starting
+# value 0x2f61, both reflected, and stored low byte first.
+#
+# Every multi-byte value is little endian. The status byte reads 0 in normal
+# use, 0x40 when the unlink button has been held, and 0x80 after a battery
+# change. The sensor count says whether an external probe is attached, and
+# when it is not, the second temperature carries a value that means nothing;
+# on the pool thermometer the humidity does the same.
+#
+# Layout from rtl_433 src/devices/inkbird_ith20r.c, checked against the
+# rtl_433_tests inkbird captures.
+name: Inkbird-ITH20R
+timing: { nrz: 100, reset_us: 4000 }
+frame: { bits: 144, find: sync, sync: "aa2dd4", sync_bits: 24 }
+check: { kind: crc16_le, poly: 0xa001, init: 0x86f4, over: [0, 128], at: 128, swap: true }
+fields:
+  - { bits: 24, const: 0xd3910f }
+  - { name: status, bits: 8, data: int, in: [0, 0x40, 0x80] }
+  - { name: sensor_num, bits: 8, data: int }
+  - { bits: 16, hidden: true }
+  - { name: battery_pct, bits: 8, data: int, unit: pct, max: 100 }
+  - { bits: 16, hidden: true }
+  - { bits: 16, hidden: true }
+  - { bits: 16, hidden: true }
+  - { bits: 16, hidden: true }
+  - { bits: 16, hidden: true }
+  - { name: version, gather: [[48, 56], [40, 48]], data: int }
+  - { name: id, gather: [[72, 80], [64, 72]], data: int, id: true }
+  - { name: temperature_c, gather: [[88, 96], [80, 88]], type: int, data: float, unit: c, scale: 0.1, min: -40, max: 80 }
+  - { name: temperature_2_c, gather: [[104, 112], [96, 104]], type: int, data: float, unit: c, scale: 0.1 }
+  - { name: humidity_pct, gather: [[120, 128], [112, 120]], data: float, unit: pct, scale: 0.1 }
+vectors:
+  - hex: "d3 91 0f 00 02 03 01 30 16 3f 19 01 2f ff 50 01 44 64"
+    fields: { status: 0, sensor_num: 2, version: 259, battery_pct: 48, id: 16150, temperature_c: 28.1, temperature_2_c: -20.9, humidity_pct: 33.6 }
+  - hex: "d3 91 0f 00 08 00 01 53 3f dc 13 01 f6 66 01 00 e8 ff"
+    fields: { status: 0, sensor_num: 8, version: 256, battery_pct: 83, id: 56383, temperature_c: 27.5, temperature_2_c: 2635.8, humidity_pct: 0.1 }

@@ -1,0 +1,38 @@
+# Globaltronics Quigg GT-TMBBQ-05 BBQ thermometer, sold at Aldi.
+# 433.92 MHz: PPM, 33 bits repeated eight times with a blank row between
+# copies. The first bit is always zero and dropping it puts the rest on byte
+# boundaries, which is what the frame here starts from.
+#
+# One probe, no channel switch, and the reading is whole degrees Fahrenheit
+# offset by ninety, ten bits split either side of the id's second byte. The
+# display shows HI and LO at the ends of the range, which are just readings
+# outside what the probe can measure.
+#
+# Two checks and both are weak: a single parity bit over the 28 bits before
+# it, and a four bit sum of the seven nibbles before that.
+#
+# One thermometer: the corpus has a single GT-TMBBQ-05.
+#
+# Layout from rtl_433 src/devices/gt_tmbbq05.c, checked against the
+# rtl_433_tests Globaltronics/GT-TMBBQ-05 captures.
+name: GT-TMBBQ05
+timing: { ppm: [2000, 4000], reset_us: 9100 }
+frame: { bits: 32, find: sync, sync: "00", sync_bits: 1, repeats: 5 }
+check:
+  - { kind: parity, over: [0, 27], at: 27 }
+  - { kind: nibble_sum, over: [0, 28], at: 28, width: 4 }
+fields:
+  - { bits: 8, hidden: true }
+  - { bits: 8, hidden: true }
+  - { bits: 8, hidden: true }
+  - { bits: 2, hidden: true }
+  - { name: unknown, bits: 1, data: int }
+  - { bits: 1, hidden: true }
+  - { bits: 4, hidden: true }
+  - { name: id, gather: [[0, 8], [16, 24]], data: int, id: true }
+  - { name: temperature_f, gather: [[24, 26], [8, 16]], data: int, unit: f, offset: -90 }
+vectors:
+  - hex: "49 b3 79 1c"
+    fields: { id: 18809, unknown: 0, temperature_f: 89 }
+  - hex: "49 b9 79 12"
+    fields: { id: 18809, unknown: 0, temperature_f: 95 }

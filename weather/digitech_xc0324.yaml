@@ -1,0 +1,32 @@
+# Digitech XC-0324 thermo-hygrometer, also sold as the AmbientWeather
+# FT005TH. 433.92 MHz: PPM, a 48 bit message sent three times a
+# transmission with two zero bits between copies, closed by an exclusive or
+# of the five bytes before it.
+#
+# The synchronisation byte stays in the frame because the check covers it.
+# Temperature and humidity both arrive least significant bit first, so both
+# fields read reversed: temperature as twelve bits of tenths of a degree
+# offset by forty, humidity as a plain byte.
+#
+# Both vectors are the same sensor. A second transmitter appears in the same
+# recordings but sends readings nothing can make sense of, and rtl_433 does
+# not report it either.
+#
+# Layout from rtl_433 src/devices/digitech_xc0324.c, checked against the
+# rtl_433_tests XC-0324 captures.
+name: Digitech-XC0324
+timing: { ppm: [520, 1000], reset_us: 3000 }
+frame: { bits: 48, find: sync, sync: "5f", sync_bits: 8, sync_skip: 0, repeats: 3 }
+check: { kind: xor8, over: [0, 40], at: 40 }
+fields:
+  - { bits: 8, const: 0x5f }
+  - { name: id, bits: 8, data: text, type: hex, upper: true, id: true }
+  - { name: temperature_c, bits: 12, reflect: true, data: float, unit: c, scale: 0.1, offset: -40, min: -40, max: 70 }
+  - { bits: 4, hidden: true, default: 0 }
+  - { name: humidity_pct, bits: 8, reflect: true, data: int, unit: pct, max: 100 }
+  - { bits: 8, hidden: true }
+vectors:
+  - hex: "5f 64 1f 80 80 24"
+    fields: { id: "64", temperature_c: 10.4, humidity_pct: 1 }
+  - hex: "5f 64 2c 40 80 d7"
+    fields: { id: "64", temperature_c: 16.4, humidity_pct: 1 }
