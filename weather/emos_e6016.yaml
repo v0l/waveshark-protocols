@@ -1,0 +1,48 @@
+# EMOS E6016 weather station and E6018 thermo-hygrometer, 433.92 MHz: PWM
+# behind a sync mark, inverted, fifteen bytes with a sum over the thirteen
+# before it and a repeat counter after it. One layout for both; the two bits
+# above the clock say which, and the E6018 has no wind sensor and no DCF77
+# receiver, so its wind reads zero and its clock is a counter that starts at
+# 2015-01-01 and never dates anything.
+#
+# Layout from rtl_433 src/devices/emos_e6016.c, checked against the frames
+# in rtl_433_tests emos_e6016/codes_test.txt. There is no recording of this
+# station in the corpus, so this one has not been read off the air. Both
+# frames there are the E6018, so the E6016 branch is unexercised.
+name: EMOS-E6016
+timing: { pwm: [280, 796], sync_us: 1836, reset_us: 850 }
+frame: { bits: 120, invert: true, find: rows, copies: 3, row_bits: [120, 121], repeats: 6 }
+check: { kind: sum8, over: [0, 104], at: 104 }
+fields:
+  - { bits: 24, const: 0xaaa583 }
+  - { name: id, bits: 8, data: int }
+  - { name: variant, bits: 2, hidden: true, in: [0, 2] }
+  - { name: variant, at: 32, bits: 2, data: int }
+  - { name: clock_year, bits: 6, data: int, offset: 2000 }
+  - { name: clock_month, bits: 4, data: int, max: 12 }
+  - { name: clock_day, bits: 5, data: int, max: 31 }
+  - { name: clock_hour, bits: 5, data: int, max: 23 }
+  - { name: clock_min, bits: 6, data: int, max: 59 }
+  - { name: clock_sec, bits: 6, data: int, max: 59 }
+  - when: { variant: 0 }
+    model: EMOS-E6018
+    fields:
+      - { name: channel, bits: 2, data: int, offset: 1, max: 4 }
+    else:
+      - { name: channel, bits: 2, data: int, offset: 1, max: 4 }
+  - { name: temperature_c, bits: 12, data: float, unit: c, type: int, scale: 0.1, min: -40, max: 70 }
+  - { name: humidity_pct, bits: 8, data: int, unit: pct, max: 100 }
+  - { name: wind_avg_ms, bits: 8, data: float, unit: m_s, scale: 0.295, round: 2, max: 60 }
+  - { name: wind_direction_deg, bits: 4, data: float, unit: deg, scale: 22.5 }
+  - { bits: 1, hidden: true, default: 0 }
+  - { name: battery_ok, bits: 1, data: bool, type: bool }
+  - { bits: 2, hidden: true, default: 0 }
+  - { bits: 8, hidden: true }
+  - { name: sequence_num, bits: 8, data: int }
+vectors:
+  - hex: "aa a5 83 b1 0f 10 9d 00 c1 30 1e 00 04 52 01"
+    model: EMOS-E6018
+    fields: { id: 177, variant: 0, clock_year: 2015, clock_month: 1, clock_day: 1, clock_hour: 7, clock_min: 16, clock_sec: 3, channel: 1, temperature_c: 30.4, humidity_pct: 30, wind_avg_ms: 0.0, wind_direction_deg: 0.0, battery_ok: true, sequence_num: 1 }
+  - hex: "aa a5 83 b1 0f 10 9e d7 41 2f 1d 00 04 a8 01"
+    model: EMOS-E6018
+    fields: { id: 177, variant: 0, clock_year: 2015, clock_month: 1, clock_day: 1, clock_hour: 7, clock_min: 45, clock_sec: 29, channel: 1, temperature_c: 30.3, humidity_pct: 29, wind_avg_ms: 0.0, wind_direction_deg: 0.0, battery_ok: true, sequence_num: 1 }

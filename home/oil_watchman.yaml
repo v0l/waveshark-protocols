@@ -1,0 +1,39 @@
+# Sensor Systems Watchman Sonic and Kingspan Watchman Sonic Plus oil tank
+# monitors, 433.92 MHz: a Si4320 framed FSK protocol, Manchester at 1000 us
+# a chip behind a six bit 111000 preamble, eight bytes with a reflected
+# CRC-8.
+#
+# The ultrasonic depth is in centimetres from the sensor to the oil, so a
+# full tank reads low; zero means it could not take a reading. Holding a
+# magnet to the sensor rebinds it, and while that is happening the low flag
+# bit is set and the byte that carries the depth counts up from 0x51 to 0x5a
+# instead. The temperature is a guess from the six bits above the depth and
+# is what rtl_433 calls maybetemp, reported raw as well as converted.
+#
+# Layout from rtl_433 src/devices/oil_watchman.c, checked against the
+# rtl_433_tests oil_watchman captures. The frames and the readings are from
+# those recordings, but WaveShark's slicer does not get a frame out of the
+# capture itself, so this one is vector-checked rather than read off the air.
+name: Oil-SonicSmart
+timing: { nrz: 1000, reset_us: 4000 }
+frame: { bits: 64, find: sync, sync: "e0", sync_bits: 6, decode: manchester }
+check: { kind: crc8_le, poly: 0x31, init: 0x00, over: [0, 56], at: 56 }
+fields:
+  - { name: id, bits: 32, data: int }
+  - { name: flags, bits: 8, data: int }
+  - { name: maybetemp, bits: 6, data: int }
+  - { bits: 2, hidden: true, default: 0 }
+  - { bits: 8, hidden: true }
+  - { bits: 8, hidden: true }
+  - { name: temperature_c, at: 40, bits: 6, data: float, unit: c, scale: -1.6666667, offset: 48.3333333, round: 3, min: -20, max: 50 }
+  - { name: bind_flag, at: 39, bits: 1, hidden: true }
+  - when: { bind_flag: 1 }
+    fields:
+      - { name: binding_countdown, at: 48, bits: 8, data: int }
+    else:
+      - { name: depth_cm, gather: [[38, 40], [48, 56]], data: int, max: 1023 }
+vectors:
+  - hex: "08 7f c4 05 80 44 60 56"
+    fields: { id: 142590981, flags: 128, maybetemp: 17, temperature_c: 20.0, depth_cm: 96 }
+  - hex: "28 4e cc 8c 80 58 57 8b"
+    fields: { id: 676252812, flags: 128, maybetemp: 22, temperature_c: 11.667, depth_cm: 87 }

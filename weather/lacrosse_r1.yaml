@@ -1,0 +1,32 @@
+# LaCrosse LTV-R1 rain gauge, 915 MHz: FSK at 104 us a chip behind a
+# d2 aa 2d d4 sync, eight bytes with a CRC-8. Rain is a count of bucket tips
+# at 0.25 mm each, sent as a high byte and a low byte with a whitening byte
+# of 0xaa between them; nobody has seen that middle byte hold anything else,
+# so here it is a constant and the count is the two bytes around it.
+#
+# The LTV-R3 and LTV-W1 share the sync and the first four bytes under a
+# longer frame and are not this description.
+#
+# Layout from rtl_433 src/devices/lacrosse_r1.c, checked against the
+# rtl_433_tests lacrosse_ltv/LTV-R1 captures.
+name: LaCrosse-R1
+timing: { nrz: 104, reset_us: 2000 }
+frame: { bits: 64, find: sync, sync: "d2aa2dd4", sync_bits: 32 }
+check: { kind: crc8, poly: 0x31, init: 0x00, over: [0, 56], at: 56 }
+fields:
+  - { name: id, bits: 24, data: int }
+  - { name: battery_ok, bits: 1, data: bool, type: bool, not: true }
+  - { name: startup, bits: 1, data: bool, type: bool }
+  - { name: flags, bits: 2, data: int }
+  - { name: sequence_num, bits: 3, data: int }
+  - { name: flag_x2, bits: 1, data: bool, type: bool }
+  - { bits: 8, hidden: true }
+  - { bits: 8, const: 0xaa }
+  - { bits: 8, hidden: true }
+  - { bits: 8, hidden: true }
+  - { name: rain_total_mm, gather: [[32, 40], [48, 56]], data: float, unit: mm, scale: 0.25 }
+vectors:
+  - hex: "38 03 22 0e 00 aa 14 6a"
+    fields: { id: 3670818, battery_ok: true, startup: false, flags: 0, sequence_num: 7, flag_x2: false, rain_total_mm: 5.0 }
+  - hex: "38 03 22 06 00 aa 26 d1"
+    fields: { id: 3670818, battery_ok: true, startup: false, flags: 0, sequence_num: 3, flag_x2: false, rain_total_mm: 9.5 }

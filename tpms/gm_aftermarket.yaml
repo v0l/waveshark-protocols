@@ -1,0 +1,30 @@
+# General Motors aftermarket tyre pressure sensors, 433.92 MHz: Manchester
+# at 120 us a chip, six bytes of zeroes then ten bytes closed by a sum of
+# the nine before it, and two trailing bits the coding leaves behind.
+#
+# Pressure is in steps of 2.75 kPa and temperature is offset by 60 C. The
+# sensors drop into a learn mode after a large pressure drop or when poked
+# with the EL-50448 tool, which shows up as the low flag bits going to zero;
+# the flags are reported raw rather than picked apart.
+#
+# Layout from rtl_433 src/devices/tpms_gm.c, checked against the
+# rtl_433_tests gm_tpms captures. WaveShark's burst detector finds nothing
+# in those recordings (v0l/waveshark#139), so this one is vector-checked
+# rather than read off the air.
+name: GM-Aftermarket
+timing: { manchester: [120, 240], reset_us: 15600 }
+frame: { bits: 82, find: sync, sync: "000000000000", sync_bits: 48, repeats: 6 }
+check: { kind: sum8, over: [0, 72], at: 72 }
+fields:
+  - { name: flags, bits: 16, data: int }
+  - { name: id, bits: 40, data: int }
+  - { name: pressure_kpa, bits: 8, data: float, unit: kpa, scale: 2.75, round: 2, max: 700 }
+  - { name: temperature_c, bits: 8, data: float, unit: c, offset: -60, round: 0, min: -60, max: 195 }
+  - { bits: 8, hidden: true }
+  - { bits: 2, hidden: true, default: 0 }
+  - { name: battery_ok, at: 10, bits: 1, data: bool, type: bool, not: true }
+vectors:
+  - hex: "4c 90 00 78 47 c1 a7 00 57 5a 00"
+    fields: { flags: 19600, id: 2017968551, pressure_kpa: 0.0, temperature_c: 27.0, battery_ok: true }
+  - hex: "4d 93 00 78 47 c1 a7 23 58 82 00"
+    fields: { flags: 19859, id: 2017968551, pressure_kpa: 96.25, temperature_c: 28.0, battery_ok: true }

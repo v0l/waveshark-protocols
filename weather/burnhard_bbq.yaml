@@ -1,0 +1,52 @@
+# Burnhard BBQ thermometer probes, 433.92 MHz: PWM behind a sync mark,
+# inverted, ten bytes with a reflected Galois digest, three copies a
+# transmission with a stray bit at the end of each row that carries nothing.
+#
+# One display takes three probes, numbered in the low bits of the settings
+# byte. Each probe sends the meat and doneness it is set to, the countdown
+# timer in BCD, the setpoint and the reading; both temperatures are in
+# tenths from -50 C and share a byte, the setpoint keeping its top nibble
+# low and the reading keeping its high. A probe that is not plugged in
+# sends zero for the reading.
+#
+# Layout from rtl_433 src/devices/burnhardbbq.c, checked against the
+# rtl_433_tests BurnhardBBQ captures.
+name: BurnhardBBQ
+timing: { pwm: [240, 484], sync_us: 840, reset_us: 848 }
+frame: { bits: 80, invert: true, find: rows, copies: 2, row_bits: [80, 82], repeats: 3 }
+check: { kind: lfsr8_reflect, gen: 0x31, key: 0xf4, over: [0, 72], at: 72 }
+fields:
+  - { name: id, bits: 8, data: int }
+  - { name: temperature_alarm, bits: 1, data: bool, type: bool }
+  - { name: timer_alarm, bits: 1, data: bool, type: bool }
+  - { name: fahrenheit, bits: 1, data: bool, type: bool }
+  - { name: timer_active, bits: 1, data: bool, type: bool }
+  - { bits: 1, hidden: true, default: 0 }
+  - { name: channel, bits: 3, data: int, max: 2 }
+  - { bits: 8, const: 0 }
+  - { name: timer_min, bits: 8, data: int, type: bcd }
+  - { bits: 1, hidden: true, default: 0 }
+  - { name: timer_sec, bits: 7, data: int, type: bcd }
+  - name: meat
+    bits: 4
+    data: text
+    map: { 0: free, 1: beef, 2: veal, 3: pork, 4: chicken, 5: lamb, 6: fish, 7: ham }
+    other: unknown
+  - name: taste
+    bits: 4
+    data: text
+    map: { 0: rare, 1: medium rare, 2: medium, 3: medium well, 4: well done }
+    other: unknown
+    omit_if: 5
+  - { bits: 8, hidden: true }
+  - { bits: 4, hidden: true }
+  - { bits: 4, hidden: true }
+  - { bits: 8, hidden: true }
+  - { bits: 8, hidden: true }
+  - { name: setpoint_c, gather: [[60, 64], [48, 56]], data: float, unit: c, scale: 0.1, offset: -50, min: -50, max: 300 }
+  - { name: temperature_c, gather: [[56, 60], [64, 72]], data: float, unit: c, scale: 0.1, offset: -50, min: -50, max: 300, omit_if: 0 }
+vectors:
+  - hex: "1f 20 00 00 00 05 b0 24 d7 9b"
+    fields: { id: 31, temperature_alarm: false, timer_alarm: false, fahrenheit: true, timer_active: false, channel: 0, timer_min: 0, timer_sec: 0, meat: free, setpoint_c: 70.0, temperature_c: 22.7 }
+  - hex: "1f 22 00 90 52 44 14 25 e5 1e"
+    fields: { id: 31, temperature_alarm: false, timer_alarm: false, fahrenheit: true, timer_active: false, channel: 2, timer_min: 90, timer_sec: 52, meat: chicken, taste: well done, setpoint_c: 80.0, temperature_c: 24.1 }

@@ -1,0 +1,27 @@
+# LaCrosse LTV-WR1 multi sensor, 915 MHz: FSK at 104 us a chip behind a
+# d2 aa 2d d4 sync, eleven bytes with a CRC-8. Wind speed, wind direction
+# and two rain counters are twelve bits each. Nobody has worked out what
+# turns the rain counts into millimetres, so they are reported as they
+# arrive.
+#
+# Layout from rtl_433 src/devices/lacrosse_wr1.c, checked against the
+# rtl_433_tests lacrosse_ltv/LTV-WR1 captures.
+name: LaCrosse-WR1
+timing: { nrz: 104, reset_us: 2000 }
+frame: { bits: 88, find: sync, sync: "d2aa2dd4", sync_bits: 32 }
+check: { kind: crc8, poly: 0x31, init: 0x00, over: [0, 80], at: 80 }
+fields:
+  - { name: id, bits: 24, data: int }
+  - { name: flags, bits: 4, data: int }
+  - { name: sequence_num, bits: 3, data: int }
+  - { name: flag_x2, bits: 1, data: bool, type: bool }
+  - { name: wind_avg_km_h, bits: 12, data: float, unit: km_h, scale: 0.1, max: 200 }
+  - { name: wind_direction_deg, bits: 12, data: int, unit: deg, max: 360 }
+  - { name: rain1_raw, bits: 12, data: int }
+  - { name: rain2_raw, bits: 12, data: int }
+  - { bits: 8, hidden: true }
+vectors:
+  - hex: "19 04 7a 1a 0c a0 dd 05 0a aa c6"
+    fields: { id: 1639546, flags: 1, sequence_num: 5, flag_x2: false, wind_avg_km_h: 20.2, wind_direction_deg: 221, rain1_raw: 80, rain2_raw: 2730 }
+  - hex: "19 04 7a 12 04 30 0d 06 6a aa ba"
+    fields: { id: 1639546, flags: 1, sequence_num: 1, flag_x2: false, wind_avg_km_h: 6.7, wind_direction_deg: 13, rain1_raw: 102, rain2_raw: 2730 }

@@ -1,0 +1,30 @@
+# LaCrosse LTV-WSDTH01 Breeze Pro, the outdoor sensor of the 79400 colour
+# forecast station. 915 MHz: FSK at about 107 us a chip behind a d2 aa 2d d4
+# sync, eleven bytes with a CRC-8. Temperature, humidity, wind speed and
+# wind direction are twelve bits each, packed three to a pair of bytes.
+#
+# The sensor only transmits when a reading has moved: 0.8 C, 1 % or
+# 0.5 km/h. Gaps in the sequence number are that, or a frame that failed
+# its CRC.
+#
+# Layout from rtl_433 src/devices/lacrosse_breezepro.c, checked against the
+# rtl_433_tests lacrosse_ltv/BreezePro_LTV-WSDTH01 captures.
+name: LaCrosse-BreezePro
+timing: { nrz: 107, reset_us: 2000 }
+frame: { bits: 88, find: sync, sync: "d2aa2dd4", sync_bits: 32 }
+check: { kind: crc8, poly: 0x31, init: 0x00, over: [0, 80], at: 80 }
+fields:
+  - { name: id, bits: 24, data: int }
+  - { name: flags, bits: 4, data: int }
+  - { name: sequence_num, bits: 3, data: int }
+  - { name: flag_x2, bits: 1, data: bool, type: bool }
+  - { name: temperature_c, bits: 12, data: float, unit: c, scale: 0.1, offset: -40, min: -40, max: 70 }
+  - { name: humidity_pct, bits: 12, data: int, unit: pct, max: 100 }
+  - { name: wind_avg_km_h, bits: 12, data: float, unit: km_h, scale: 0.1, max: 200 }
+  - { name: wind_direction_deg, bits: 12, data: int, unit: deg, max: 360 }
+  - { bits: 8, hidden: true }
+vectors:
+  - hex: "0b 38 29 0e 2a 80 37 03 10 26 ec"
+    fields: { id: 735273, flags: 0, sequence_num: 7, flag_x2: false, temperature_c: 28.0, humidity_pct: 55, wind_avg_km_h: 4.9, wind_direction_deg: 38 }
+  - hex: "0b 38 29 06 2a 30 36 07 01 28 33"
+    fields: { id: 735273, flags: 0, sequence_num: 3, flag_x2: false, temperature_c: 27.5, humidity_pct: 54, wind_avg_km_h: 11.2, wind_direction_deg: 296 }
