@@ -1,0 +1,66 @@
+# Acurite 00275rm and 00276rm room monitors, 433.92 MHz: PWM, inverted,
+# eleven bytes sent three times, closed by a reflected CRC-8 with polynomial
+# 0xb2 and starting value 0xd0. rtl_433 runs that as a sixteen bit CRC, but
+# the polynomial fits in eight bits so the register never grows past one
+# byte and the stored byte is a plain CRC-8.
+#
+# Both models take an optional probe, and the two bits above the temperature
+# say which one is plugged in: 1 a water leak detector, 2 a soil temperature
+# probe, 3 a spot probe that reads temperature and humidity. With no probe
+# those bytes are zero. The water probe reports wet by filling its nibble
+# with ones.
+#
+# The flag bytes are reported raw because only two of their bits are known:
+# battery in the second byte and the bit that tells the two models apart.
+#
+# Layout from rtl_433 src/devices/acurite.c, checked against the
+# rtl_433_tests acurite/Acurite_00275rm captures.
+name: Acurite-00275rm
+timing: { pwm: [232, 420], sync_us: 632, reset_us: 708 }
+frame: { bits: 88, invert: true, find: rows, copies: 2, row_bits: [88, 89], repeats: 3 }
+check: { kind: crc8_le, poly: 0x4d, init: 0x0b, over: [0, 80], at: 80 }
+fields:
+  - { bits: 16, hidden: true }
+  - { name: flags, bits: 8, data: int }
+  - { bits: 8, hidden: true }
+  - { name: temperature_c, bits: 12, data: float, unit: c, scale: 0.1, offset: -100, min: -40, max: 70 }
+  - { bits: 2, const: 0 }
+  - { name: probe, bits: 2, data: int }
+  - { name: flags2, bits: 3, data: int }
+  - { name: humidity_pct, bits: 7, data: int, unit: pct, max: 100 }
+  - { name: flags3, bits: 2, data: int }
+  - { bits: 4, hidden: true, default: 0 }
+  - { bits: 8, hidden: true, default: 0 }
+  - { bits: 1, hidden: true, default: 0 }
+  - { bits: 7, hidden: true, default: 0 }
+  - { bits: 8, hidden: true }
+  - { name: id, gather: [[0, 16], [24, 32]], data: int, id: true }
+  - { name: model_flag, at: 23, bits: 1, data: int }
+  - when: { model_flag: 1 }
+    fields:
+      - { name: battery_ok, at: 17, bits: 1, data: bool, type: bool }
+  - when: { model_flag: 0 }
+    model: Acurite-00276rm
+    fields:
+      - { name: battery_ok, at: 17, bits: 1, data: bool, type: bool }
+  - when: { probe: 1 }
+    fields:
+      - { name: water, at: 60, bits: 4, data: bool, type: bool, at_least: 15 }
+  - when: { probe: 2 }
+    fields:
+      - { name: temperature_1_c, gather: [[60, 72]], data: float, unit: c, scale: 0.1, offset: -100, min: -40, max: 70 }
+  - when: { probe: 3 }
+    fields:
+      - { name: temperature_1_c, gather: [[60, 72]], data: float, unit: c, scale: 0.1, offset: -100, min: -40, max: 70 }
+      - { name: humidity_1_pct, at: 73, bits: 7, data: int, unit: pct, max: 100 }
+vectors:
+  - hex: "00 0c dd b5 48 f0 25 c0 00 00 47"
+    fields: { id: 3253, flags: 221, model_flag: 1, battery_ok: true, temperature_c: 16.7, probe: 0, flags2: 1, humidity_pct: 23, flags3: 0 }
+  - hex: "00 15 5a cf 4b 40 2c 80 00 00 a8"
+    model: Acurite-00276rm
+    fields: { id: 5583, flags: 90, model_flag: 0, battery_ok: true, temperature_c: 20.4, probe: 0, flags2: 1, humidity_pct: 50, flags3: 0 }
+  - hex: "00 0c dd b5 42 13 0d 34 89 2c a3"
+    fields: { id: 3253, flags: 221, model_flag: 1, battery_ok: true, temperature_c: 5.7, probe: 3, flags2: 0, humidity_pct: 52, flags3: 3, temperature_1_c: 16.1, humidity_1_pct: 44 }
+  - hex: "00 15 5a cf 4b 61 0b 8f 00 00 f3"
+    model: Acurite-00276rm
+    fields: { id: 5583, flags: 90, model_flag: 0, battery_ok: true, temperature_c: 20.6, probe: 1, flags2: 0, humidity_pct: 46, flags3: 0, water: true }

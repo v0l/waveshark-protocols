@@ -1,0 +1,29 @@
+# Steelmate TP-S15 tyre pressure sensors, also sold as R-Lake. 433.92 MHz:
+# FSK Manchester at 50 us a chip, inverted, and every byte sent least
+# significant bit first, so the frame needs reflecting before anything reads
+# it. Seven bytes with a sum of the six before it.
+#
+# Pressure is in thirty-seconds of a bar, which comes out as 3.125 kPa a
+# step. The battery byte counts down from 3.9 V in ten millivolt steps, and
+# two values are alarms rather than readings: 0xff is a fast leak and 0xfe a
+# slow one.
+#
+# Layout from rtl_433 src/devices/steelmate.c, checked against the
+# rtl_433_tests steelmate-TPMS captures.
+name: Steelmate
+timing: { manchester: [50, 100], reset_us: 120 }
+frame: { bits: 56, invert: true, find: sync, sync: "ffff", sync_bits: 16 }
+transform: [reflect_bytes]
+check: { kind: sum8, over: [0, 48], at: 48 }
+fields:
+  - { bits: 8, const: 0x01 }
+  - { name: id, bits: 16, data: text, type: hex, id: true }
+  - { name: pressure_kpa, bits: 8, data: float, unit: kpa, scale: 3.125, round: 3 }
+  - { name: temperature_c, bits: 8, data: int, unit: c, offset: -50, min: -40, max: 120 }
+  - { name: battery_mv, bits: 8, data: int, unit: mv, scale: -10, offset: 3900 }
+  - { bits: 8, hidden: true }
+vectors:
+  - hex: "01 5d a8 4f 51 7f 25"
+    fields: { id: "5da8", pressure_kpa: 246.875, temperature_c: 31, battery_mv: 2630 }
+  - hex: "01 51 33 53 4d 7c a1"
+    fields: { id: "5133", pressure_kpa: 259.375, temperature_c: 27, battery_mv: 2660 }

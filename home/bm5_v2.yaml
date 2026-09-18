@@ -1,0 +1,36 @@
+# BM5-v2 12 V automotive battery monitor, sold as the Ancel BM200 and the
+# Quicklynks BM5-D. 433.92 MHz: PWM, inverted, eleven bytes with a sum of
+# the ten before it, sent every second or two.
+#
+# Both voltages are little endian counts of 1/1600 of a volt: the first is
+# the battery now, the second the lowest it reached during the last start,
+# which is what the health figure is worked out from. Temperature is a
+# magnitude with its sign in the bit below it. The two error bits are what
+# lights the display's CHARGING and CRANKING warnings.
+#
+# One monitor: the corpus has only the one BM5.
+#
+# Layout from rtl_433 src/devices/bm5.c, checked against the rtl_433_tests
+# bm5v2 captures and codes.
+name: BM5-v2
+timing: { pwm: [225, 675], reset_us: 6000 }
+frame: { bits: 88, invert: true, find: rows, copies: 1, row_bits: [88, 89] }
+check: { kind: sum8, over: [0, 80], at: 80 }
+fields:
+  - { name: id, bits: 24, data: int, id: true }
+  - { name: health_pct, bits: 7, data: int, unit: pct, max: 100 }
+  - { name: charging_error, bits: 1, data: bool, type: bool }
+  - { name: charge_pct, bits: 7, data: int, unit: pct, max: 100 }
+  - { name: cranking_error, bits: 1, data: bool, type: bool }
+  - { name: temperature_c, bits: 7, data: int, unit: c, sign: 47, min: -40, max: 90 }
+  - { bits: 1, hidden: true, default: 0 }
+  - { bits: 16, hidden: true }
+  - { bits: 16, hidden: true }
+  - { bits: 8, hidden: true }
+  - { name: battery_v, gather: [[56, 64], [48, 56]], data: float, unit: v, scale: 0.000625, round: 3, max: 20 }
+  - { name: starting_v, gather: [[72, 80], [64, 72]], data: float, unit: v, scale: 0.000625, round: 3, max: 20 }
+vectors:
+  - hex: "f1 54 b5 96 c8 2c a2 50 7b 37 28"
+    fields: { id: 15815861, health_pct: 75, charging_error: false, charge_pct: 100, cranking_error: false, temperature_c: 22, battery_v: 12.901, starting_v: 8.877 }
+  - hex: "f1 54 b5 96 51 03 a8 4b f3 40 0a"
+    fields: { id: 15815861, health_pct: 75, charging_error: false, charge_pct: 40, cranking_error: true, temperature_c: -1, battery_v: 12.105, starting_v: 10.392 }

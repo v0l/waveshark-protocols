@@ -1,0 +1,33 @@
+# Efergy Elite IR optical energy sensor, the clip-on head that watches a
+# meter's flashing LED. 433.55 MHz: FSK PWM, inverted, twelve bytes closed
+# by a CRC-16 CCITT.
+#
+# All the sensor sends is how many meter pulses it counted in its reporting
+# window. Turning that into kilowatt hours needs the meter's pulses-per-kWh
+# rating, which is printed on the meter and not on the air, so this reports
+# the count and the window and leaves the arithmetic to whoever knows the
+# meter. The reporting interval is set by holding the sensor's button: 30
+# seconds for the red LED, 60 for orange, 90 for green.
+#
+# One sensor: the corpus has only the one Efergy head.
+#
+# Layout from rtl_433 src/devices/efergy_optical.c, checked against the
+# rtl_433_tests efergy_optical captures.
+name: Efergy-Optical
+timing: { pwm: [64, 136], sync_us: 496, reset_us: 1916 }
+frame: { bits: 96, invert: true, find: rows, copies: 1, row_bits: [96, 97] }
+check: { kind: crc16, poly: 0x1021, init: 0x0000, over: [0, 80], at: 80 }
+fields:
+  - { name: id, bits: 24, data: int, id: true }
+  - { bits: 2, const: 1 }
+  - { name: interval_s, bits: 2, data: int, unit: s, scale: 30, offset: 30, max: 120 }
+  - { bits: 4, const: 0 }
+  - { bits: 32, const: 0 }
+  - { name: pulse_count, bits: 8, data: int }
+  - { name: sample_interval_s, bits: 8, data: int, unit: s }
+  - { bits: 16, hidden: true }
+vectors:
+  - hex: "0a a2 ba 40 00 00 00 00 06 0f e6 6c"
+    fields: { id: 697018, interval_s: 30, pulse_count: 6, sample_interval_s: 15 }
+  - hex: "0a a2 ba 40 00 00 00 00 07 0f d5 5d"
+    fields: { id: 697018, interval_s: 30, pulse_count: 7, sample_interval_s: 15 }
