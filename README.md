@@ -18,8 +18,9 @@ sells it, since the same layout ships under a dozen brands:
 - `weather/` temperature, humidity, rain and wind sensors
 - `remotes/` fixed-code keyfobs, gate and garage remotes
 - `tpms/` tyre pressure sensors
-- `meters/` utility meters
+- `home/` doorbells, mains switches and the like
 - `security/` door and window sensors, alarm panels
+- `meters/` utility meters
 
 The receiver reads every `.yaml` in the tree, whatever directory it is in;
 the directories are for people.
@@ -43,13 +44,28 @@ vectors:
     fields: { id: 0x5c, channel: 2, temperature_c: 19.4, humidity_pct: 62, battery_ok: true }
 ```
 
-### timing
+### timing, or radio
 
-One of `pwm: [short, long]` (the mark carries the bit), `ppm: [short,
+A protocol read off the burst detector has a `timing`: one of `pwm: [short, long]` (the mark carries the bit), `ppm: [short,
 long]` (the gap does), `manchester: [half, full]` or `nrz: bit_us`, all in
 microseconds, with `reset_us` for the gap that ends a package, `sync_us`
 where a sync mark opens each frame, and `tolerance_us`. These are rtl_433's
 numbers and copy straight from its decoders.
+
+A protocol read off its own FSK channel has a `radio` instead, or as well:
+
+```yaml
+radio: { fsk: { baud: 38400, deviation_hz: 20000 }, bands: [[433.0e6, 434.8e6]], width_hz: 100000 }
+```
+
+`fsk` names the demodulator by `baud` and peak `deviation_hz` (with an
+optional `bandwidth_hz` in front of it, Carson's rule if unsaid);
+`bands` or `channels` say where in the spectrum the channel can be;
+`width_hz` is the channel's width; `rate_hz` the rate the bit clock runs
+at (eight samples a symbol if unsaid); `id` the word a scanner names it by.
+Such a description appears in WaveShark's mode menu and scanner table and
+is placed on any source the detector finds in its bands. Its `find` must be
+`sync`, since the bits are a stream.
 
 ### frame
 
@@ -65,8 +81,8 @@ numbers and copy straight from its decoders.
   `sync_skip` bits after it, `either_polarity` searching the complement too
   and `decode: manchester` or `diff_manchester` reading the bits behind it
   as chips.
-- `row_bits: [lo, hi]`: with any other `find`, a row of the package must be
-  this long.
+- `row_bits: [lo, hi]`: with `find: rows`, the rows a frame is taken from;
+  with any other `find`, a row of the package must be this long.
 - `min_transitions`: refuses a frame that is one symbol repeated.
   `not_constant: n`: refuses one whose first `n` bits are all alike.
 - `repeats`: copies one transmission sends, for keying.
@@ -80,17 +96,27 @@ numbers and copy straight from its decoders.
 the bits covered (the end exclusive, packed into bytes) and `at` the bit the
 stored value starts at. Kinds: `crc8`, `crc8_le`, `crc16`, `crc16_le` (with
 `poly` and `init`), `sum8`, `xor8`, `lfsr8` and `lfsr8_reflect` (with `gen`
-and `key`), `even_parity` (every byte covered, nothing stored) and
-`complement` (the stored bits are the covered bits inverted). `xor` is
-applied to the computed value. A frame with a check reports it as verified;
-one without reports no integrity check, which the packet list shows.
+and `key`), `nibble_sum` (with `add` or `negate` from `init`, and `width`
+where the stored sum is not a byte), `nibble_xor`, `even_parity` (every
+byte covered, nothing stored) and `complement` (the stored bits are the
+covered bits inverted). `xor` is applied to the computed value; `reflect`
+stores it low bit first and sums nibbles as they read reversed; `swap`
+stores a byte with its nibbles swapped. `when` and `unless` make a check
+apply only for some value of a field, for a polynomial chosen by channel.
+A frame with a check reports it as verified; one without reports no
+integrity check, which the packet list shows.
 
 ### fields
 
 Fields are read in order, most significant bit first, and every bit of the
 frame belongs to exactly one field in turn, a `const`, or a nameless
-`hidden` slot (which a check fills on encode). A field with `at:` is a
-view over bits another field owns: reported on decode, ignored on encode.
+`hidden` slot (which a check fills on encode, or `default` does). A field
+with `at:` or `gather:` is a view over bits other fields own: reported on
+decode, and on encode the bits it says are written into whatever owns
+them, so a status byte scattered across a frame still keys. `gather` is a
+list of bit positions or `[from, to]` runs, most significant first; a
+hidden owner read under the same name as a reported view (a message type
+that decides a layout before it is reached) is filled from it.
 
 - `data`: what the field reports, `int`, `float`, `bool` or `text`. Every
   reported field states it, and a file whose line computes something else
@@ -104,6 +130,7 @@ view over bits another field owns: reported on decode, ignored on encode.
   is not `idle`, for a remote with a slot per button), `format` (text from
   other fields, `{name}` or `{name:02}`).
 - `not`, `reflect`: the bits are complemented, or sent low bit first.
+  `sign: bit` names a bit elsewhere that negates the reading.
 - `per_byte: 7`: only the low seven bits of each byte carry the value.
 - `scale`, `offset`, `convert: f_to_c`, `round`: raw count to reading. A
   whole-number scale keeps the reading a count.
@@ -111,6 +138,7 @@ view over bits another field owns: reported on decode, ignored on encode.
 - `map: { raw: value }`, `other: value`: name the values that are not the
   number. `at_least: n` makes a bool of a wider field.
 - `omit_if: raw` or a list: not reported, and the first when not supplied.
+  `default: raw` is what a hidden owner is written as when nothing says.
 - `hidden`: read for conditions only. `id: true`: names the transmitter.
 - `when: { field: value }` on a field, or a group `when` / `fields` / `else`
   with an optional `model` that renames the report.
@@ -124,12 +152,11 @@ installed.
 
 ## What is not here
 
-A description says what it can invert. Alecto V1 and Globaltronics
-(checksums with message-dependent terms), Honeywell (a CRC polynomial chosen
-by channel), Hideki (parity bits inside every byte), Oregon Scientific, X10
-(a Gray-coded house switch), Interlogix, the Acurite 5-in-1, the Toyota, Ford
-and Renault TPMS, the ERT meters, KeeLoq, Somfy RTS and the electronic shelf
-labels stay written in WaveShark.
+A description says what it can invert. Globaltronics (a rolling byte for
+a check), Hideki (a parity bit inside every byte), Oregon v2.1 (every bit
+sent twice), Interlogix (parity folded over the frame), the ERT meters,
+KeeLoq, Somfy RTS, ISM868 and the electronic shelf labels stay written in
+WaveShark.
 
 Layouts here are transcribed from [rtl_433](https://github.com/merbanan/rtl_433)
 and the Flipper Zero firmware, which are the only descriptions most of these
