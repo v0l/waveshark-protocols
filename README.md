@@ -32,12 +32,12 @@ timing: { ppm: [1000, 2000], reset_us: 5000 }
 frame: { bits: 36, repeats: 12 }
 yields_to: [Rubicson-Temperature]
 fields:
-  - { name: id, bits: 8 }
-  - { name: battery_ok, bits: 1, type: bool }
-  - { name: channel, bits: 2, offset: 1, max: 3 }
-  - { name: temperature_c, bits: 12, type: int, scale: 0.1, min: -40, max: 70 }
+  - { name: id, bits: 8, data: int }
+  - { name: battery_ok, bits: 1, data: bool, type: bool }
+  - { name: channel, bits: 2, data: int, offset: 1, max: 3 }
+  - { name: temperature_c, bits: 12, data: float, unit: c, type: int, scale: 0.1, min: -40, max: 70 }
   - { bits: 4, const: 0xf }
-  - { name: humidity_pct, bits: 8, max: 100, omit_if: 0 }
+  - { name: humidity_pct, bits: 8, data: int, unit: pct, max: 100, omit_if: 0 }
 vectors:
   - hex: "5c 90 c2 f3 e0"
     fields: { id: 0x5c, channel: 2, temperature_c: 19.4, humidity_pct: 62, battery_ok: true }
@@ -92,7 +92,14 @@ frame belongs to exactly one field in turn, a `const`, or a nameless
 `hidden` slot (which a check fills on encode). A field with `at:` is a
 view over bits another field owns: reported on decode, ignored on encode.
 
-- `type`: `uint` (default), `int` (two's complement), `bool`, `bcd`, `hex`,
+- `data`: what the field reports, `int`, `float`, `bool` or `text`. Every
+  reported field states it, and a file whose line computes something else
+  (a `scale: 0.1` on a field said to be `int`) is refused. `unit`: the
+  unit a reading is in, one of `c`, `f`, `pct`, `hpa`, `kpa`, `psi`, `v`,
+  `mv`, `a`, `w`, `kwh`, `km_h`, `m_s`, `kt`, `mm`, `deg`, `ppm`, `db`,
+  `hz`, `mhz`, `s`. Both travel with the report, so a chart or a Home
+  Assistant entity reads them off the field rather than off its name.
+- `type`: how the bits are read: `uint` (default), `int` (two's complement), `bool`, `bcd`, `hex`,
   `sign_mag`, `tristate` (PT226x pin pairs), `pick` (which `unit` wide slot
   is not `idle`, for a remote with a slot per button), `format` (text from
   other fields, `{name}` or `{name:02}`).
