@@ -1,0 +1,20 @@
+# ThermoPro TP11 meat thermometer probe, 433.92 MHz: PPM, four bytes with an
+# LFSR digest for a check, sent three or four times with a trailing bit the
+# slicer sometimes keeps. The id is twelve bits ending mid-byte and the
+# temperature is the twelve after it, in tenths from -20 C.
+#
+# Layout from rtl_433 src/devices/thermopro_tp11.c, checked against the
+# rtl_433_tests thermopro-tp11 captures.
+name: Thermopro-TP11
+timing: { ppm: [500, 1500], reset_us: 4000 }
+frame: { bits: 32, find: rows, copies: 2, row_bits: [32, 34], repeats: 4 }
+check: { kind: lfsr8_reflect, gen: 0x51, key: 0x04, over: [0, 24], at: 24 }
+fields:
+  - { name: id, bits: 12, data: int }
+  - { name: temperature_c, bits: 12, data: float, unit: c, scale: 0.1, offset: -20, min: -20, max: 300 }
+  - { bits: 8, hidden: true }
+vectors:
+  - hex: "db 41 57 c2"
+    fields: { id: 3508, temperature_c: 14.3 }
+  - hex: "db 41 9c 1d"
+    fields: { id: 3508, temperature_c: 21.2 }

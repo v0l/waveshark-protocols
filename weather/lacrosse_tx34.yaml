@@ -1,0 +1,25 @@
+# LaCrosse TX34-IT rain gauge, 868.3 MHz: FSK at 58 us a chip behind the
+# IT+ family's 2d d4 sync, five bytes with a CRC-8. Same frame as the TX29
+# and TX35 with a 5 in the model nibble, and the sixteen bits those sensors
+# use for temperature and humidity counting bucket tips instead, each worth
+# 0.222 mm.
+#
+# Layout from rtl_433 src/devices/lacrosse_tx34.c, checked against the
+# rtl_433_tests lacrosse/tx34-it capture, which is the only recording of
+# this gauge there is, hence the single vector.
+name: LaCrosse-TX34IT
+timing: { nrz: 58, reset_us: 1500 }
+frame: { bits: 40, find: sync, sync: "a2dd40", sync_bits: 20 }
+check: { kind: crc8, poly: 0x31, init: 0x00, over: [0, 32], at: 32 }
+fields:
+  - { bits: 4, const: 5 }
+  - { name: id, bits: 6, data: int }
+  - { name: battery_new, bits: 1, data: bool, type: bool }
+  - { name: battery_ok, bits: 1, data: bool, type: bool, not: true }
+  - { bits: 4, const: 0 }
+  - { name: rain_raw, bits: 16, data: int }
+  - { bits: 8, hidden: true }
+  - { name: rain_total_mm, at: 16, bits: 16, data: float, unit: mm, scale: 0.222, round: 3 }
+vectors:
+  - hex: "54 40 00 07 b3"
+    fields: { id: 17, battery_new: false, battery_ok: true, rain_raw: 7, rain_total_mm: 1.554 }

@@ -1,0 +1,36 @@
+# Cavius smoke, heat and water detectors, 869.67 MHz: FSK at 4800 bps,
+# Manchester behind the ASCII sync word "Cavi", eleven bytes inverted. The
+# frame is complemented before the sync is looked for, so the sync here is
+# "Cavi" inverted rather than as the chip sends it. The
+# network id is the master unit's serial and the sender id is the unit that
+# spoke, so a household of alarms all report the same network. The message
+# byte is repeated inverted, which is a check in itself, and a Maxim CRC-8
+# closes the first seven bytes.
+#
+# Message bits: 0x80 pairing, 0x40 test, 0x20 fire alarm, 0x10 warning or
+# water, 0x08 low battery, 0x04 muted, and two nobody has named.
+#
+# Layout from rtl_433 src/devices/cavius.c, checked against the
+# rtl_433_tests cavius capture. Only one transmitter was available, so
+# there is one vector rather than the two a description should carry.
+name: Cavius-Security
+timing: { nrz: 208, reset_us: 2000 }
+frame: { bits: 88, find: sync, sync: "bc9e8996", sync_bits: 32, decode: manchester, invert: true }
+check:
+  - { kind: crc8_le, poly: 0x31, init: 0x00, over: [0, 48], at: 48 }
+  - { kind: complement, over: [32, 40], at: 40 }
+fields:
+  - { name: net_id, bits: 32, data: int }
+  - { name: message, bits: 8, data: int }
+  - { bits: 8, hidden: true }
+  - { bits: 8, hidden: true }
+  - { name: id, bits: 32, data: int }
+  - { name: pairing, at: 32, bits: 1, data: bool, type: bool }
+  - { name: test, at: 33, bits: 1, data: bool, type: bool }
+  - { name: alarm, at: 34, bits: 1, data: bool, type: bool }
+  - { name: warning, at: 35, bits: 1, data: bool, type: bool }
+  - { name: battery_ok, at: 36, bits: 1, data: bool, type: bool, not: true }
+  - { name: muted, at: 37, bits: 1, data: bool, type: bool }
+vectors:
+  - hex: "00 04 1f df 80 7f 6d 00 04 1f df"
+    fields: { net_id: 270303, message: 128, id: 270303, pairing: true, test: false, alarm: false, warning: false, battery_ok: true, muted: false }

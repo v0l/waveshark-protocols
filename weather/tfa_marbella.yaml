@@ -1,0 +1,26 @@
+# TFA Dostmann Marbella pool thermometer (30.3238.06), 868 MHz: FSK at
+# 105 us a chip, eleven bytes counting the aa 2d d4 sync, closed by a
+# reflected Galois digest over the seven bytes from the serial on. Twelve
+# bits of 0xaaa sit between the temperature and the digest.
+#
+# Layout from rtl_433 src/devices/tfa_marbella.c, checked against the
+# rtl_433_tests TFA-Marbella-30.3238.06 captures.
+name: TFA-Marbella
+timing: { nrz: 105, reset_us: 2000 }
+frame: { bits: 88, find: sync, sync: "aa2dd4", sync_bits: 24, sync_skip: 0 }
+check: { kind: lfsr8_reflect, gen: 0x31, key: 0x31, over: [24, 80], at: 80 }
+fields:
+  - { bits: 24, const: 0xaa2dd4 }
+  - { name: id, bits: 24, data: text, type: hex }
+  - { name: battery_ok, bits: 1, data: bool, type: bool, not: true }
+  - { bits: 3, hidden: true, default: 0 }
+  - { name: sequence_num, bits: 3, data: int }
+  - { bits: 1, hidden: true, default: 0 }
+  - { name: temperature_c, bits: 12, data: float, unit: c, scale: 0.1, offset: -40, min: -20, max: 60 }
+  - { bits: 12, const: 0xaaa }
+  - { bits: 8, hidden: true }
+vectors:
+  - hex: "aa 2d d4 68 3f 16 0a 27 4a aa 6b"
+    fields: { id: "683f16", battery_ok: true, sequence_num: 5, temperature_c: 22.8 }
+  - hex: "aa 2d d4 68 3f 16 0c 27 4a aa 62"
+    fields: { id: "683f16", battery_ok: true, sequence_num: 6, temperature_c: 22.8 }

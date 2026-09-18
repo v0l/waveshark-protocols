@@ -1,0 +1,39 @@
+# TS-FT002 ultrasonic tank level meter, 433.92 MHz: PPM, nine bytes sent
+# least significant bit first, closed by an exclusive-or that includes the
+# 0xfa sync byte. Depth is in centimetres with its low nibble in the byte
+# that carries the battery flag, and temperature is in tenths from -40 C
+# with its low nibble under the transmit interval. A depth of 0x5dc or a
+# temperature of 0x3e8 is the meter saying it could not read.
+#
+# Layout from rtl_433 src/devices/ts_ft002.c, checked against the
+# rtl_433_tests TS-FT002 captures. rtl_433 also accepts rows a bit or two
+# short by putting the missing bits back; here a row has to be whole.
+name: TS-FT002
+timing: { ppm: [464, 948], reset_us: 2000 }
+frame: { bits: 72, find: rows, copies: 1, row_bits: [72, 73], repeats: 2 }
+transform: [reflect_bytes]
+check: { kind: xor8, over: [0, 64], at: 64 }
+fields:
+  - { bits: 8, const: 0xfa }
+  - { name: id, bits: 8, data: int }
+  - { bits: 8, const: 0x11 }
+  - { bits: 8, hidden: true }
+  - { name: flags, bits: 4, data: int }
+  - { bits: 4, hidden: true }
+  - name: transmit_s
+    bits: 4
+    data: int
+    unit: s
+    map: { 0: 180, 7: 5, 8: 30, 9: 30, 10: 30, 11: 30, 12: 30, 13: 30, 14: 30, 15: 5 }
+    other: 0
+  - { bits: 4, hidden: true }
+  - { bits: 8, hidden: true }
+  - { name: rain_raw, bits: 8, data: int }
+  - { bits: 8, hidden: true }
+  - { name: depth_mm, gather: [[24, 32], [36, 40]], data: float, unit: mm, scale: 10, round: 0, max: 15000 }
+  - { name: temperature_c, gather: [[48, 56], [44, 48]], data: float, unit: c, scale: 0.1, offset: -40, min: -40, max: 80 }
+vectors:
+  - hex: "fa b6 11 06 84 06 26 00 ff"
+    fields: { id: 182, flags: 8, transmit_s: 180, rain_raw: 0, depth_mm: 1000.0, temperature_c: 21.4 }
+  - hex: "fa b6 11 07 8c 03 26 00 f3"
+    fields: { id: 182, flags: 8, transmit_s: 180, rain_raw: 0, depth_mm: 1240.0, temperature_c: 21.1 }

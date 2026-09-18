@@ -1,0 +1,29 @@
+# Eurochron EFTH-800 thermo-hygrometer, 433.92 MHz: PWM behind a sync mark,
+# inverted, six bytes with a CRC-8. The sensor also sends a longer frame
+# carrying the DCF77 clock, which this description does not read.
+#
+# The bit above the temperature is the sensor's own sign flag and says the
+# same thing as the sign of the ten-bit reading below it, so it is reported
+# rather than dropped.
+#
+# Layout from rtl_433 src/devices/efth800.c, checked against the
+# rtl_433_tests Eurochron-EFTH800 captures.
+name: Eurochron-EFTH800
+timing: { pwm: [250, 500], sync_us: 750, reset_us: 5500 }
+frame: { bits: 48, invert: true, find: rows, copies: 2, row_bits: [48, 50], repeats: 2 }
+check: { kind: crc8, poly: 0x31, init: 0x00, over: [0, 40], at: 40 }
+fields:
+  - { bits: 1, hidden: true, default: 0 }
+  - { name: channel, bits: 3, data: int, offset: 1, max: 8 }
+  - { name: id, bits: 12, data: int }
+  - { name: battery_ok, bits: 1, data: bool, type: bool, not: true }
+  - { name: sign_flag, bits: 1, data: bool, type: bool }
+  - { name: temperature_c, bits: 10, data: float, unit: c, type: int, scale: 0.1, min: -40, max: 70 }
+  - { bits: 4, hidden: true, default: 0 }
+  - { name: humidity_pct, bits: 8, data: int, unit: pct, type: bcd, max: 100 }
+  - { bits: 8, hidden: true }
+vectors:
+  - hex: "1b 78 4f 40 42 27"
+    fields: { channel: 2, id: 2936, battery_ok: true, sign_flag: true, temperature_c: 24.4, humidity_pct: 42 }
+  - hex: "47 14 4f 60 40 87"
+    fields: { channel: 5, id: 1812, battery_ok: true, sign_flag: true, temperature_c: 24.6, humidity_pct: 40 }

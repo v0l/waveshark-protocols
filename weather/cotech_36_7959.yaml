@@ -1,0 +1,44 @@
+# Cotech 36-7959 weather station, also SwitchDoc Labs FT020T, Sainlogic
+# WS019T and FT0300, Ragova FT-0310 and NicetyMeter 0366. 433.92 MHz,
+# Manchester at 500 us a half bit, fourteen bytes behind a twelve bit
+# preamble with a CRC-8 over the lot.
+#
+# Wind speed, gust and direction each keep their top bit in the flag nibble
+# after the id, and the sunlight reading keeps its top bit in the nibble
+# above the temperature. A station without a light sensor sends 0xfb for the
+# UV index and ones for the light, so both are left out then.
+#
+# Layout from rtl_433 src/devices/cotech_36_7959.c, checked against the
+# rtl_433_tests cotech captures.
+name: Cotech-367959
+timing: { manchester: [500, 1000], reset_us: 1200 }
+frame: { bits: 112, find: sync, sync: "0140", sync_bits: 12 }
+check: { kind: crc8, poly: 0x31, init: 0xc0, over: [0, 104], at: 104 }
+fields:
+  - { name: subtype, bits: 4, data: int }
+  - { name: id, bits: 8, data: int }
+  - { name: battery_ok, bits: 1, data: bool, type: bool, not: true }
+  - { bits: 3, hidden: true }
+  - { bits: 8, hidden: true }
+  - { bits: 8, hidden: true }
+  - { bits: 8, hidden: true }
+  - { bits: 4, hidden: true }
+  - { bits: 12, hidden: true }
+  - { bits: 1, hidden: true, default: 1 }
+  - { bits: 3, hidden: true, default: 0 }
+  - { bits: 12, hidden: true }
+  - { name: humidity_pct, bits: 8, data: int, unit: pct, max: 100 }
+  - { bits: 16, hidden: true, default: 0xfffb }
+  - { name: uv_index, bits: 8, data: float, scale: 0.1, omit_if: 0xfb }
+  - { bits: 8, hidden: true }
+  - { name: wind_avg_ms, gather: [15, [16, 24]], data: float, unit: m_s, scale: 0.1, max: 60 }
+  - { name: wind_gust_ms, gather: [14, [24, 32]], data: float, unit: m_s, scale: 0.1, max: 60 }
+  - { name: wind_direction_deg, gather: [13, [32, 40]], data: int, unit: deg, max: 360 }
+  - { name: rain_total_mm, gather: [[44, 56]], data: float, unit: mm, scale: 0.1 }
+  - { name: temperature_c, gather: [[60, 72]], data: float, unit: c, scale: 0.1, offset: -40, convert: f_to_c, round: 2, min: -40, max: 70 }
+  - { name: light_lux, gather: [56, [80, 96]], data: int, omit_if: 0x1fffb }
+vectors:
+  - hex: "c5 40 00 00 bc 03 18 84 6b 22 ff fb fb b9"
+    fields: { subtype: 12, id: 84, battery_ok: true, humidity_pct: 34, wind_avg_ms: 0.0, wind_gust_ms: 0.0, wind_direction_deg: 188, rain_total_mm: 79.2, temperature_c: 22.83 }
+  - hex: "c5 40 00 00 bd 03 18 84 6b 22 ff fb fb 0c"
+    fields: { subtype: 12, id: 84, battery_ok: true, humidity_pct: 34, wind_avg_ms: 0.0, wind_gust_ms: 0.0, wind_direction_deg: 189, rain_total_mm: 79.2, temperature_c: 22.83 }

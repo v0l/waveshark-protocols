@@ -1,0 +1,30 @@
+# Davies Craig TyreGuard 400 tyre pressure sensors, 434.1 MHz: Manchester at
+# 100 us a chip, eleven bytes including the fd 5f d5 f sync, closed by a
+# CRC-8 started at 0xdd. Pressure keeps its top three bits in the flag byte
+# at the end, so the two halves are read back together; temperature is
+# offset by 40 C. Setting both of the low flag bits is how a new sensor is
+# paired with the display.
+#
+# Layout from rtl_433 src/devices/tpms_tyreguard400.c, checked against the
+# rtl_433_tests tyreguard_400 captures.
+name: TyreGuard400
+timing: { manchester: [100, 200], reset_us: 500 }
+frame: { bits: 88, find: sync, sync: "fd5fd5f0", sync_bits: 28, sync_skip: 0 }
+check: { kind: crc8, poly: 0x31, init: 0xdd, over: [0, 80], at: 80 }
+fields:
+  - { bits: 28, const: 0xfd5fd5f }
+  - { name: id, bits: 28, data: text, type: hex }
+  - { bits: 8, hidden: true }
+  - { name: temperature_c, bits: 8, data: float, unit: c, offset: -40, round: 0, min: -40, max: 120 }
+  - { bits: 1, hidden: true, default: 0 }
+  - { bits: 3, hidden: true }
+  - { name: ack_leaking, bits: 1, data: bool, type: bool }
+  - { bits: 1, hidden: true, default: 0 }
+  - { name: leaking, bits: 2, data: int }
+  - { bits: 8, hidden: true }
+  - { name: pressure_kpa, gather: [[73, 76], [56, 64]], data: int, unit: kpa, max: 2047 }
+vectors:
+  - hex: "fd 5f d5 f6 b2 25 ab fb 2f 30 2b"
+    fields: { id: "6b225ab", temperature_c: 7.0, ack_leaking: false, leaking: 0, pressure_kpa: 1019 }
+  - hex: "fd 5f d5 f6 b2 13 7b e8 2f 30 60"
+    fields: { id: "6b2137b", temperature_c: 7.0, ack_leaking: false, leaking: 0, pressure_kpa: 1000 }

@@ -1,0 +1,31 @@
+# Schou 72543 rain gauge and thermometer, also Motonet MTX, MarQuant, TFA
+# Dostmann 30.3252.01 and ADE WS1907. 433.92 MHz: PWM behind a long sync
+# mark, eight bytes closed by a running sum of the seven before it. Rain and
+# temperature are both sent low byte first. The rain counter starts at
+# 6553.5 mm and wraps to zero, so a fresh gauge reads full.
+#
+# Layout from rtl_433 src/devices/schou_72543_rain.c, checked against the
+# rtl_433_tests Schou captures.
+name: Schou-72543
+timing: { pwm: [972, 2680], sync_us: 7328, reset_us: 2712 }
+frame: { bits: 64, find: rows, copies: 2, row_bits: [64, 72], repeats: 3 }
+check: { kind: sum8, over: [0, 56], at: 56 }
+fields:
+  - { name: id, bits: 16, data: int }
+  - { name: battery_ok, bits: 1, data: bool, type: bool, not: true }
+  - { name: repeated, bits: 1, data: bool, type: bool }
+  - { bits: 2, const: 0 }
+  - { name: sequence_num, bits: 3, data: int }
+  - { bits: 1, hidden: true, default: 0 }
+  - { bits: 8, hidden: true }
+  - { bits: 8, hidden: true }
+  - { bits: 8, hidden: true }
+  - { bits: 8, hidden: true }
+  - { bits: 8, hidden: true }
+  - { name: rain_total_mm, gather: [[32, 40], [24, 32]], data: float, unit: mm, scale: 0.1 }
+  - { name: temperature_c, gather: [[48, 56], [40, 48]], data: float, unit: c, scale: 0.1, offset: -90, convert: f_to_c, round: 1, min: -40, max: 70 }
+vectors:
+  - hex: "31 ee 06 ff ff d2 05 fa"
+    fields: { id: 12782, battery_ok: true, repeated: false, sequence_num: 3, rain_total_mm: 6553.5, temperature_c: 15.0 }
+  - hex: "31 ee 0a 00 00 d2 05 00"
+    fields: { id: 12782, battery_ok: true, repeated: false, sequence_num: 5, rain_total_mm: 0.0, temperature_c: 15.0 }

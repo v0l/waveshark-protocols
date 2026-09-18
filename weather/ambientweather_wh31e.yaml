@@ -1,0 +1,43 @@
+# Ambient Weather WH31E and EcoWitt WH31B thermo-hygrometers, 868 and
+# 915 MHz: FSK at 56 us a chip, an aa aa aa preamble and a 2d d4 sync, then
+# seven bytes closed by a CRC-8 and a sum of everything before it. The type
+# byte is the only thing separating the two models, which are otherwise the
+# same layout. The transmission carries four more bytes of zeroes after the
+# sum, which nothing reads.
+#
+# Layout from rtl_433 src/devices/ambientweather_wh31e.c, checked against
+# the rtl_433_tests ecowitt/WH31B captures. The WH40, WN20 and WS68 share
+# this wire format under other type bytes and are not this description.
+name: AmbientWeather-WH31E
+timing: { nrz: 56, reset_us: 1500 }
+frame: { bits: 56, find: sync, sync: "aa2dd4", sync_bits: 24 }
+check:
+  - { kind: crc8, poly: 0x31, init: 0x00, over: [0, 40], at: 40 }
+  - { kind: sum8, over: [0, 48], at: 48 }
+fields:
+  - { name: message_type, bits: 8, hidden: true, in: [0x30, 0x37] }
+  - { name: message_type, at: 0, bits: 8, data: int }
+  - when: { message_type: 0x37 }
+    model: AmbientWeather-WH31B
+    fields:
+      - { name: id, bits: 8, data: int }
+    else:
+      - { name: id, bits: 8, data: int }
+  - { bits: 1, const: 1 }
+  - { name: channel, bits: 3, data: int, offset: 1, max: 8 }
+  - { bits: 1, hidden: true, default: 0 }
+  - { name: battery_ok, bits: 1, data: bool, type: bool, not: true }
+  - { name: temperature_c, bits: 10, data: float, unit: c, scale: 0.1, offset: -40, min: -40, max: 60 }
+  - { name: humidity_pct, bits: 8, data: int, unit: pct, max: 100 }
+  - { bits: 8, hidden: true }
+  - { bits: 8, hidden: true }
+vectors:
+  - hex: "37 5c a2 92 30 64 5b"
+    model: AmbientWeather-WH31B
+    fields: { message_type: 0x37, id: 92, channel: 3, battery_ok: true, temperature_c: 25.8, humidity_pct: 48 }
+  - hex: "37 9a 92 76 38 ed fe"
+    model: AmbientWeather-WH31B
+    fields: { message_type: 0x37, id: 154, channel: 2, battery_ok: true, temperature_c: 23.0, humidity_pct: 56 }
+  - hex: "37 a2 c2 79 38 76 c2"
+    model: AmbientWeather-WH31B
+    fields: { message_type: 0x37, id: 162, channel: 5, battery_ok: true, temperature_c: 23.3, humidity_pct: 56 }

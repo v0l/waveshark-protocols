@@ -1,0 +1,24 @@
+# Rubicson 48942 pool thermometer, 433.92 MHz: PWM behind sync pulses,
+# inverted, five bytes with a CRC-8, sent twice. The sending interval is 55
+# seconds plus the channel number, which is how eight of them share the band.
+# Temperature is eleven bits in tenths from -102.4 C.
+#
+# Layout from rtl_433 src/devices/rubicson_pool_48942.c, checked against the
+# rtl_433_tests rubicson/pool_thermometer_48942 captures.
+name: Rubicson-48942
+timing: { pwm: [280, 480], sync_us: 730, reset_us: 6000 }
+frame: { bits: 40, invert: true, find: rows, copies: 2, row_bits: [40, 42], repeats: 2 }
+check: { kind: crc8, poly: 0x31, init: 0x00, over: [0, 32], at: 32 }
+fields:
+  - { name: channel, bits: 4, data: int, offset: 1, max: 8 }
+  - { name: id, bits: 10, data: int }
+  - { bits: 2, const: 2 }
+  - { name: battery_ok, bits: 1, data: bool, type: bool, not: true }
+  - { name: temperature_c, bits: 11, data: float, unit: c, scale: 0.1, offset: -102.4, round: 1, min: -20, max: 60 }
+  - { bits: 4, const: 0 }
+  - { bits: 8, hidden: true }
+vectors:
+  - hex: "07 da 46 a0 e0"
+    fields: { channel: 1, id: 502, battery_ok: true, temperature_c: 10.6 }
+  - hex: "07 da 4b 70 a4"
+    fields: { channel: 1, id: 502, battery_ok: true, temperature_c: 18.3 }

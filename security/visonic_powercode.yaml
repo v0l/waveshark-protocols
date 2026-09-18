@@ -1,0 +1,30 @@
+# Visonic PowerCode door, window and motion sensors, 433.92 MHz: PWM, a
+# start bit, a 24-bit device id, a byte of flags and a nibble that is the
+# exclusive-or of the eight nibbles before it. Six copies a transmission.
+# The flag byte says why the sensor spoke: tamper, alarm, low battery, a
+# restore after an alarm, the periodic supervision message, or that a
+# repeater passed it on.
+#
+# Layout from rtl_433 src/devices/visonic_powercode.c, checked against the
+# rtl_433_tests visonic_powercode captures.
+name: Visonic-Powercode
+timing: { pwm: [400, 800], reset_us: 5000, tolerance_us: 160 }
+frame: { bits: 37, find: rows, copies: 2, row_bits: [37, 38], repeats: 6 }
+check: { kind: nibble_xor, over: [1, 33], at: 33 }
+fields:
+  - { bits: 1, const: 1 }
+  - { name: id, bits: 24, data: text, type: hex }
+  - { name: tamper, bits: 1, data: bool, type: bool }
+  - { name: alarm, bits: 1, data: bool, type: bool }
+  - { name: battery_ok, bits: 1, data: bool, type: bool, not: true }
+  - { name: event_else, bits: 1, data: bool, type: bool }
+  - { name: restore, bits: 1, data: bool, type: bool }
+  - { name: supervised, bits: 1, data: bool, type: bool }
+  - { name: spidernet, bits: 1, data: bool, type: bool }
+  - { name: repeater, bits: 1, data: bool, type: bool }
+  - { bits: 4, hidden: true }
+vectors:
+  - hex: "b7 a3 b8 26 28"
+    fields: { id: "6f4770", tamper: false, alarm: true, battery_ok: true, event_else: false, restore: true, supervised: true, spidernet: false, repeater: false }
+  - hex: "b7 a3 b8 06 08"
+    fields: { id: "6f4770", tamper: false, alarm: false, battery_ok: true, event_else: false, restore: true, supervised: true, spidernet: false, repeater: false }

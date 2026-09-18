@@ -1,0 +1,44 @@
+# Fine Offset WN34 soil and water temperature probes, also Ecowitt WN34S,
+# WN34L and WN34D, Froggit DP150 and DP35, and the WN38 black globe
+# thermometer under its own family byte. FSK at 58 us a chip behind an
+# aa aa aa preamble and a 2d d4 sync, nine bytes closed by a CRC-8 and a
+# sum. A few more bits follow that nothing reads.
+#
+# The sub type nibble decides the temperature: 4 is the wide-range probe,
+# which sends tenths of a degree straight, and everything else is offset by
+# 40 C. Battery is in steps of 20 mV.
+#
+# Layout from rtl_433 src/devices/fineoffset_wn34.c, checked against the
+# rtl_433_tests ecowitt/WN34L captures.
+name: Fineoffset-WN34
+timing: { nrz: 58, reset_us: 2500 }
+frame: { bits: 72, find: sync, sync: "aa2dd4", sync_bits: 24 }
+check:
+  - { kind: crc8, poly: 0x31, init: 0x00, over: [0, 56], at: 56 }
+  - { kind: sum8, over: [0, 64], at: 64 }
+fields:
+  - { name: message_type, bits: 8, hidden: true, in: [0x34, 0x38] }
+  - { name: message_type, at: 0, bits: 8, data: int }
+  - { name: id, bits: 24, data: text, type: hex }
+  - { name: sub_type, bits: 4, data: int }
+  - { bits: 12, hidden: true }
+  - { bits: 1, hidden: true, default: 0 }
+  - { name: battery_mv, bits: 7, data: float, unit: mv, scale: 20, round: 0 }
+  - { bits: 8, hidden: true }
+  - { bits: 8, hidden: true }
+  - when: { message_type: 0x38 }
+    model: Fineoffset-WN38
+    fields:
+      - { name: temperature_c, at: 36, bits: 12, data: float, unit: c, type: int, scale: 0.1, min: -55, max: 125 }
+    else:
+      - when: { sub_type: 4 }
+        model: Fineoffset-WN34D
+        fields:
+          - { name: temperature_c, at: 36, bits: 12, data: float, unit: c, type: int, scale: 0.1, min: -55, max: 125 }
+        else:
+          - { name: temperature_c, at: 36, bits: 12, data: float, unit: c, type: int, scale: 0.1, offset: -40, min: -40, max: 60 }
+vectors:
+  - hex: "34 00 3b cd 02 1d 44 6a 09"
+    fields: { message_type: 0x34, id: "003bcd", sub_type: 0, battery_mv: 1360.0, temperature_c: 14.1 }
+  - hex: "34 00 3b cd 02 8c 44 d3 e1"
+    fields: { message_type: 0x34, id: "003bcd", sub_type: 0, battery_mv: 1360.0, temperature_c: 25.2 }

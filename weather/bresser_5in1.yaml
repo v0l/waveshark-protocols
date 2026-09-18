@@ -1,0 +1,72 @@
+# Bresser Weather Center 5-in-1, 868.3 MHz: FSK at 124 us a chip behind an
+# aa aa aa 2d d4 preamble, twenty-six bytes of which the first thirteen are
+# the complement of the last thirteen. That complement is the whole integrity
+# check; the byte before the id counts set bits and nothing verifies it.
+#
+# Readings are BCD with the digits out of order: wind speed, temperature and
+# rain each keep their hundreds digit in a later byte's low nibble, and the
+# gust is plain binary with its top nibble similarly displaced. A reading the
+# station could not take sends 0xf in its units nibble, which is why the
+# reported fields hang off the nibble read before them.
+#
+# Layout from rtl_433 src/devices/bresser_5in1.c, checked against the
+# rtl_433_tests bresser_5in1/01 captures.
+name: Bresser-5in1
+timing: { nrz: 124, reset_us: 25000 }
+frame: { bits: 208, find: sync, sync: "aaaaaa2dd4", sync_bits: 40 }
+check:
+  - { kind: complement, over: [104, 168], at: 0 }
+  - { kind: complement, over: [168, 208], at: 64 }
+fields:
+  - { bits: 32, hidden: true }
+  - { bits: 32, hidden: true }
+  - { bits: 32, hidden: true }
+  - { bits: 8, hidden: true }
+  # set bits in the bytes that follow, which no decoder has ever agreed on
+  - { name: bit_count, bits: 8, data: int }
+  - { name: id, bits: 8, data: int }
+  - { name: startup, bits: 1, data: bool, type: bool, not: true }
+  - { name: sensor_type, bits: 7, hidden: true }
+  - { name: sensor_type, at: 121, bits: 7, data: int }
+  - { bits: 8, hidden: true }
+  - { name: wind_direction_deg, bits: 4, data: float, unit: deg, scale: 22.5 }
+  - { bits: 4, hidden: true }
+  - { bits: 8, hidden: true }
+  - { bits: 4, hidden: true, default: 1 }
+  - { bits: 4, hidden: true }
+  - { bits: 4, hidden: true }
+  - { name: temp_units, bits: 4, hidden: true }
+  - { bits: 4, hidden: true }
+  - { bits: 4, hidden: true }
+  - { bits: 4, hidden: true }
+  - { name: hum_units, bits: 4, hidden: true }
+  - { bits: 16, hidden: true }
+  - { name: battery_ok, bits: 1, data: bool, type: bool, not: true }
+  - { bits: 3, hidden: true }
+  - { name: temp_sign, bits: 4, hidden: true, in: [0, 8] }
+  - { name: wind_gust_ms, gather: [[140, 144], [128, 136]], data: float, unit: m_s, scale: 0.1 }
+  - { name: wind_avg_ms, gather: [[156, 160], [144, 148], [148, 152]], data: float, unit: m_s, type: bcd, scale: 0.1 }
+  - name: temperature_c
+    gather: [[172, 176], [160, 164], [164, 168]]
+    data: float
+    unit: c
+    type: bcd
+    scale: 0.1
+    sign: 204
+    min: -50
+    max: 70
+    when: { temp_units: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9] }
+  - name: humidity_pct
+    at: 176
+    bits: 8
+    data: int
+    unit: pct
+    type: bcd
+    max: 100
+    when: { hum_units: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9] }
+  - { name: rain_total_mm, gather: [[192, 200], [184, 192]], data: float, unit: mm, type: bcd, scale: 0.1 }
+vectors:
+  - hex: "ea 89 7f e1 2f df ef 7f ff 6d fb fe ff 15 76 80 1e d0 20 10 80 00 92 04 01 00"
+    fields: { id: 118, sensor_type: 0, bit_count: 0x15, startup: false, battery_ok: true, temperature_c: 8.0, humidity_pct: 92, wind_gust_ms: 3.0, wind_avg_ms: 2.0, wind_direction_deg: 292.5, rain_total_mm: 10.4 }
+  - hex: "e9 89 7f eb ff dc ef 86 ff 6d fb fe ff 16 76 80 14 00 23 10 79 00 92 04 01 00"
+    fields: { id: 118, sensor_type: 0, bit_count: 0x16, startup: false, battery_ok: true, temperature_c: 7.9, humidity_pct: 92, wind_gust_ms: 2.0, wind_avg_ms: 2.3, wind_direction_deg: 0.0, rain_total_mm: 10.4 }

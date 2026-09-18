@@ -1,0 +1,25 @@
+# VDO TG1C tyre pressure sensors, 433.92 MHz: fitted to the Abarth 124
+# Spider, some Fiat 124 Spider and some Mazda MX-5 ND, and sold aftermarket
+# as the Alligator sens.it RS3. FSK at 52 us a chip, Manchester behind an
+# aaa9 preamble, nine bytes closed by an exclusive-or over the eight before
+# it. Pressure is in steps of 1.38 kPa and temperature is offset by 50 C.
+#
+# Layout from rtl_433 src/devices/tpms_abarth124.c, checked against the
+# rtl_433_tests abarth124_tpms captures. The twelve byte Shenzhen EGQ Q85
+# shares this layout with a CRC-16 after it and is not this description.
+name: Abarth-124Spider
+timing: { nrz: 52, reset_us: 150 }
+frame: { bits: 72, find: sync, sync: "aaa9", sync_bits: 16, decode: manchester, either_polarity: true }
+check: { kind: xor8, over: [0, 64], at: 64 }
+fields:
+  - { name: id, bits: 32, data: text, type: hex }
+  - { name: flags, bits: 8, data: text, type: hex }
+  - { name: pressure_kpa, bits: 8, data: float, unit: kpa, scale: 1.38, round: 2, min: 0, max: 450 }
+  - { name: temperature_c, bits: 8, data: float, unit: c, offset: -50, round: 0, min: -50, max: 125 }
+  - { name: status, bits: 8, data: int }
+  - { bits: 8, hidden: true }
+vectors:
+  - hex: "0f 54 76 e8 b7 53 44 01 64"
+    fields: { id: "0f5476e8", flags: "b7", pressure_kpa: 114.54, temperature_c: 18.0, status: 1 }
+  - hex: "0f 54 76 ea b7 95 40 01 a4"
+    fields: { id: "0f5476ea", flags: "b7", pressure_kpa: 205.62, temperature_c: 14.0, status: 1 }

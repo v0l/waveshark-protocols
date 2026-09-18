@@ -1,0 +1,29 @@
+# Geevon TX16-3 outdoor sensor with an LCD, 433.92 MHz: PWM behind a sync
+# mark, inverted, nine bytes with a CRC-8 started at 0x7b. Three fixed bytes
+# aa 55 aa sit between the humidity and the check, which is free
+# identification. Temperature is twelve bits in tenths from -50 C.
+#
+# The Geevon TX19-1 sends the same layout under a different checksum and is
+# not this description.
+#
+# Layout from rtl_433 src/devices/geevon.c, checked against the
+# rtl_433_tests geevon/tx16 captures, which hold one transmitter sending
+# one reading, hence the single vector.
+name: Geevon-TX163
+timing: { pwm: [250, 500], sync_us: 750, reset_us: 1700 }
+frame: { bits: 72, invert: true, find: rows, copies: 3, row_bits: [72, 74], repeats: 5 }
+check: { kind: crc8, poly: 0x31, init: 0x7b, over: [0, 64], at: 64 }
+fields:
+  - { name: id, bits: 8, data: int }
+  - { name: battery_ok, bits: 1, data: bool, type: bool, not: true }
+  - { bits: 1, hidden: true, default: 0 }
+  - { name: channel, bits: 2, data: int, offset: 1, max: 3 }
+  - { bits: 4, hidden: true, default: 0 }
+  - { name: temperature_c, bits: 12, data: float, unit: c, scale: 0.1, offset: -50, min: -40, max: 70 }
+  - { bits: 4, const: 0 }
+  - { name: humidity_pct, bits: 8, data: int, unit: pct, max: 100 }
+  - { bits: 24, const: 0xaa55aa }
+  - { bits: 8, hidden: true }
+vectors:
+  - hex: "f4 00 2a c0 39 aa 55 aa 11"
+    fields: { id: 244, battery_ok: true, channel: 1, temperature_c: 18.4, humidity_pct: 57 }

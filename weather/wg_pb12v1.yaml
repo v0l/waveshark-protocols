@@ -1,0 +1,25 @@
+# WG-PB12V1 temperature probe, 433.92 MHz: PWM, a byte of ones then five
+# bytes with a CRC-8. Same wire format as the Fine Offset WH2, with a 3 in
+# the type nibble where the WH2 has a 4, and the humidity byte always ones
+# because there is no humidity element. The three bits above the id are not
+# understood; they are reported rather than dropped.
+#
+# Layout from rtl_433 src/devices/wg_pb12v1.c, checked against the
+# rtl_433_tests wg_pb12v1 captures.
+name: WG-PB12V1
+timing: { pwm: [564, 1476], reset_us: 2500 }
+frame: { bits: 48, find: rows, copies: 1, row_bits: [48, 49], repeats: 2 }
+check: { kind: crc8, poly: 0x31, init: 0x00, over: [8, 40], at: 40 }
+fields:
+  - { bits: 8, const: 0xff }
+  - { bits: 4, const: 3 }
+  - { name: temperature_c, bits: 12, data: float, unit: c, scale: 0.1, offset: -40, min: -40, max: 70 }
+  - { name: flags, bits: 3, data: int }
+  - { name: id, bits: 5, data: int }
+  - { bits: 8, const: 0xff }
+  - { bits: 8, hidden: true }
+vectors:
+  - hex: "ff 32 61 68 ff 4c"
+    fields: { temperature_c: 20.9, flags: 3, id: 8 }
+  - hex: "ff 32 85 5c ff 0a"
+    fields: { temperature_c: 24.5, flags: 2, id: 28 }
