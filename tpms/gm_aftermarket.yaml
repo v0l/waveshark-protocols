@@ -13,7 +13,7 @@
 # rather than read off the air.
 name: GM-Aftermarket
 timing: { manchester: [120, 240], reset_us: 15600 }
-frame: { bits: 82, find: sync, sync: "000000000000", sync_bits: 48, repeats: 6 }
+frame: { bits: 82, find: sync, sync: "000000000000", sync_bits: 48, repeats: 6, row_bits: [136, 140] }
 check: { kind: sum8, over: [0, 72], at: 72 }
 fields:
   - { name: flags, bits: 16, data: int }
